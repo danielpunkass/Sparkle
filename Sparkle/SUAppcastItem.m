@@ -6,7 +6,7 @@
 //  Copyright 2006 Andy Matuschak. All rights reserved.
 //
 
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcastItem.h>
 #import "SULog.h"
 #import "SUConstants.h"
 #import "SUSignatures.h"

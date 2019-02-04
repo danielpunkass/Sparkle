@@ -7,19 +7,19 @@
 #import "SUPipedUnarchiver.h"
 #import "SUBinaryDeltaCommon.h"
 #import "SUFileManager.h"
-#import "SUAppcast.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcast.h>
+#import <Sparkle/SUAppcastItem.h>
 #import "SUBasicUpdateDriver.h"
-#import "SUVersionComparisonProtocol.h"
-#import "SUStandardVersionComparator.h"
+#import <Sparkle/SUVersionComparisonProtocol.h>
+#import <Sparkle/SUStandardVersionComparator.h>
 
-#import "SPUDownloader.h"
-#import "SPUDownloaderDelegate.h"
-#import "SPUDownloaderDeprecated.h"
-#import "SPUDownloadData.h"
-#import "SPUDownloaderProtocol.h"
-#import "SPUDownloaderSession.h"
-#import "SPUURLRequest.h"
+#import <Sparkle/SPUDownloader.h>
+#import <Sparkle/SPUDownloaderDelegate.h>
+#import <Sparkle/SPUDownloaderDeprecated.h>
+#import <Sparkle/SPUDownloadData.h>
+#import <Sparkle/SPUDownloaderProtocol.h>
+#import <Sparkle/SPUDownloaderSession.h>
+#import <Sparkle/SPUURLRequest.h>
 
 #import <CommonCrypto/CommonCrypto.h>
 

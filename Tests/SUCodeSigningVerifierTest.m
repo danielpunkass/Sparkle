@@ -8,7 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
-#import "SUCodeSigningVerifier.h"
+#import <Sparkle/SUCodeSigningVerifier.h>
 #import "SUFileManager.h"
 
 #define CALCULATOR_PATH @"/Applications/Calculator.app"

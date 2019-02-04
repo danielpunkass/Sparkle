@@ -8,7 +8,7 @@
 
 #import "SUScheduledUpdateDriver.h"
 #import "SUUpdaterPrivate.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdaterDelegate.h>
 
 @interface SUScheduledUpdateDriver ()
 

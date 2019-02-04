@@ -8,7 +8,7 @@
 
 #import "SUAutomaticUpdateAlert.h"
 #import "SULocalizations.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcastItem.h>
 #import "SUApplicationInfo.h"
 #import "SUHost.h"
 #import "SUTouchBarForwardDeclarations.h"

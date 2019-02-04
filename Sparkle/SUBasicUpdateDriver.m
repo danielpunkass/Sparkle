@@ -11,23 +11,23 @@
 #import "SUUnarchiverProtocol.h"
 #import "SUHost.h"
 #import "SUOperatingSystem.h"
-#import "SUStandardVersionComparator.h"
+#import <Sparkle/SUStandardVersionComparator.h>
 #import "SUUnarchiver.h"
 #import "SUConstants.h"
 #import "SULog.h"
 #import "SUBinaryDeltaCommon.h"
 #import "SUUpdaterPrivate.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdaterDelegate.h>
 #import "SUFileManager.h"
 #import "SUUpdateValidator.h"
 #import "SULocalizations.h"
-#import "SUErrors.h"
-#import "SUAppcast.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUErrors.h>
+#import <Sparkle/SUAppcast.h>
+#import <Sparkle/SUAppcastItem.h>
 
-#import "SPUURLRequest.h"
-#import "SPUDownloaderDeprecated.h"
-#import "SPUDownloaderSession.h"
+#import <Sparkle/SPUURLRequest.h>
+#import <Sparkle/SPUDownloaderDeprecated.h>
+#import <Sparkle/SPUDownloaderSession.h>
 
 @interface SUBasicUpdateDriver ()
 

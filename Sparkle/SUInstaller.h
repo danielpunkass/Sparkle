@@ -7,7 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "SUVersionComparisonProtocol.h"
+#import <Sparkle/SUVersionComparisonProtocol.h>
 
 NS_ASSUME_NONNULL_BEGIN
 

@@ -8,13 +8,13 @@
 
 #import "SUAutomaticUpdateDriver.h"
 #import "SUUpdaterPrivate.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdaterDelegate.h>
 #import "SULocalizations.h"
-#import "SUErrors.h"
+#import <Sparkle/SUErrors.h>
 #import "SUAutomaticUpdateAlert.h"
 #import "SUHost.h"
 #import "SUConstants.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcastItem.h>
 #import "SUApplicationInfo.h"
 
 // If the user hasn't quit in a week, ask them if they want to relaunch to get the latest bits. It doesn't matter that this measure of "one day" is imprecise.

@@ -8,7 +8,7 @@
 
 #import "SUProbingUpdateDriver.h"
 #import "SUUpdaterPrivate.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdaterDelegate.h>
 
 @implementation SUProbingUpdateDriver
 

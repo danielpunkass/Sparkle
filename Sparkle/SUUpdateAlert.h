@@ -10,7 +10,7 @@
 #define SUUPDATEALERT_H
 
 #import <Cocoa/Cocoa.h>
-#import "SUVersionDisplayProtocol.h"
+#import <Sparkle/SUVersionDisplayProtocol.h>
 
 @protocol SUUpdateAlertDelegate;
 

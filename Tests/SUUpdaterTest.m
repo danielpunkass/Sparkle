@@ -8,8 +8,8 @@
 
 #import <XCTest/XCTest.h>
 #import "SUConstants.h"
-#import "SUUpdater.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdater.h>
+#import <Sparkle/SUUpdaterDelegate.h>
 
 @interface SUUpdaterTest : XCTestCase <SUUpdaterDelegate>
 @property (strong) NSOperationQueue *queue;

@@ -13,7 +13,7 @@
 #import "SUGuidedPackageInstaller.h"
 #import "SUHost.h"
 #import "SULog.h"
-#import "SUErrors.h"
+#import <Sparkle/SUErrors.h>
 
 
 #include "AppKitPrevention.h"

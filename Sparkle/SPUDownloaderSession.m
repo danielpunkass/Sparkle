@@ -6,12 +6,12 @@
 //  Copyright © 2017 Sparkle Project. All rights reserved.
 //
 
-#import "SPUDownloaderSession.h"
-#import "SPUURLRequest.h"
+#import <Sparkle/SPUDownloaderSession.h>
+#import <Sparkle/SPUURLRequest.h>
 #import "SPUDownloader_Private.h"
 #import "SPULocalCacheDirectory.h"
-#import "SUErrors.h"
-#import "SPUDownloadData.h"
+#import <Sparkle/SUErrors.h>
+#import <Sparkle/SPUDownloadData.h>
 
 #include "AppKitPrevention.h"
 

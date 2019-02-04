@@ -10,8 +10,8 @@
 #define SUBASICUPDATEDRIVER_H
 
 #import "SUUpdateDriver.h"
-#import "SPUDownloader.h"
-#import "SPUDownloaderDelegate.h"
+#import <Sparkle/SPUDownloader.h>
+#import <Sparkle/SPUDownloaderDelegate.h>
 
 @class SUAppcast, SUAppcastItem, SUHost, SPUDownloadData;
 @interface SUBasicUpdateDriver : SUUpdateDriver <SPUDownloaderDelegate>

@@ -8,7 +8,7 @@
 
 #include <Security/CodeSigning.h>
 #include <Security/SecCode.h>
-#import "SUCodeSigningVerifier.h"
+#import <Sparkle/SUCodeSigningVerifier.h>
 #import "SULog.h"
 
 

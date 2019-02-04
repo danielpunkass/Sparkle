@@ -1,9 +1,9 @@
 #import <Cocoa/Cocoa.h>
 #import "SULocalizations.h"
-#import "SUErrors.h"
+#import <Sparkle/SUErrors.h>
 #import "SUInstaller.h"
 #import "SUHost.h"
-#import "SUStandardVersionComparator.h"
+#import <Sparkle/SUStandardVersionComparator.h>
 #import "SUStatusController.h"
 #import "SULog.h"
 #import "SUInstallerProtocol.h"

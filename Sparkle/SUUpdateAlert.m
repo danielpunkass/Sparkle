@@ -18,7 +18,7 @@
 #import "SUConstants.h"
 #import "SULog.h"
 #import "SULocalizations.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcastItem.h>
 #import "SUApplicationInfo.h"
 #import "SUSystemUpdateInfo.h"
 #import "SUTouchBarForwardDeclarations.h"

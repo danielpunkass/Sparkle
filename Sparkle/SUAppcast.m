@@ -6,18 +6,18 @@
 //  Copyright 2006 Andy Matuschak. All rights reserved.
 //
 
-#import "SUAppcast.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcast.h>
+#import <Sparkle/SUAppcastItem.h>
 #import "SULog.h"
 #import "SULocalizations.h"
-#import "SUErrors.h"
+#import <Sparkle/SUErrors.h>
 
-#import "SPUURLRequest.h"
+#import <Sparkle/SPUURLRequest.h>
 #import "SUOperatingSystem.h"
-#import "SPUDownloadData.h"
-#import "SPUDownloaderDelegate.h"
-#import "SPUDownloaderDeprecated.h"
-#import "SPUDownloaderSession.h"
+#import <Sparkle/SPUDownloadData.h>
+#import <Sparkle/SPUDownloaderDelegate.h>
+#import <Sparkle/SPUDownloaderDeprecated.h>
+#import <Sparkle/SPUDownloaderSession.h>
 
 #include "AppKitPrevention.h"
 

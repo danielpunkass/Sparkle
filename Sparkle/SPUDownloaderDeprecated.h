@@ -6,7 +6,7 @@
 //  Copyright © 2017 Sparkle Project. All rights reserved.
 //
 
-#import "SPUDownloader.h"
+#import <Sparkle/SPUDownloader.h>
 
 @interface SPUDownloaderDeprecated : SPUDownloader <SPUDownloaderProtocol>
 

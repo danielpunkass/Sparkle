@@ -9,7 +9,7 @@
 #ifndef SPUDownloader_Private_h
 #define SPUDownloader_Private_h
 
-#import "SPUDownloaderDelegate.h"
+#import <Sparkle/SPUDownloaderDelegate.h>
 
 typedef NS_ENUM(NSUInteger, SPUDownloadMode)
 {

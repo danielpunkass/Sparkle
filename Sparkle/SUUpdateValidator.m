@@ -8,7 +8,7 @@
 
 #import "SUUpdateValidator.h"
 #import "SUSignatureVerifier.h"
-#import "SUCodeSigningVerifier.h"
+#import <Sparkle/SUCodeSigningVerifier.h>
 #import "SUInstaller.h"
 #import "SUHost.h"
 #import "SULog.h"

@@ -10,13 +10,13 @@
 
 #import "SUUpdateAlert.h"
 #import "SUUpdaterPrivate.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdaterDelegate.h>
 #import "SUHost.h"
 #import "SUOperatingSystem.h"
 #import "SUStatusController.h"
 #import "SUConstants.h"
 #import "SULocalizations.h"
-#import "SUAppcastItem.h"
+#import <Sparkle/SUAppcastItem.h>
 #import "SUApplicationInfo.h"
 
 #if __MAC_OS_X_VERSION_MAX_ALLOWED < 1080

@@ -10,7 +10,7 @@
 #define SUCODESIGNINGVERIFIER_H
 
 #import <Foundation/Foundation.h>
-#import "SUExport.h"
+#import <Sparkle/SUExport.h>
 
 SU_EXPORT @interface SUCodeSigningVerifier : NSObject
 + (BOOL)codeSignatureAtBundleURL:(NSURL *)oldBundlePath matchesSignatureAtBundleURL:(NSURL *)newBundlePath error:(NSError  **)error;

@@ -6,8 +6,8 @@
 //  Copyright 2006 Andy Matuschak. All rights reserved.
 //
 
-#import "SUUpdater.h"
-#import "SUUpdaterDelegate.h"
+#import <Sparkle/SUUpdater.h>
+#import <Sparkle/SUUpdaterDelegate.h>
 #import "SUUpdaterPrivate.h"
 
 #import "SUHost.h"
@@ -20,7 +20,7 @@
 #import "SUScheduledUpdateDriver.h"
 #import "SUConstants.h"
 #import "SULog.h"
-#import "SUCodeSigningVerifier.h"
+#import <Sparkle/SUCodeSigningVerifier.h>
 #import "SULocalizations.h"
 #include <SystemConfiguration/SystemConfiguration.h>
 #import "SUSystemProfiler.h"

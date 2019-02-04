@@ -7,12 +7,12 @@
 //
 
 #import "SUPlainInstaller.h"
-#import "SUVersionComparisonProtocol.h"
-#import "SUStandardVersionComparator.h"
+#import <Sparkle/SUVersionComparisonProtocol.h>
+#import <Sparkle/SUStandardVersionComparator.h>
 #import "SUFileManager.h"
 #import "SUHost.h"
 #import "SULog.h"
-#import "SUErrors.h"
+#import <Sparkle/SUErrors.h>
 
 
 #include "AppKitPrevention.h"
