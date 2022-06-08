@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXAggregateTarget section */
@@ -3141,6 +3141,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		6131B1910DDCDE32005215F0 /* Run Script: Set Git Version Info */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 12;
 			files = (
 			);
@@ -3156,6 +3157,7 @@
 		};
 		72045CE626FEE8CC004F96E5 /* Strip XPC Services */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -3171,24 +3173,31 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"$SRCROOT/Configurations/strip-xpc-services.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		720B4C2125EBFAA5005A0592 /* Run Script: Link Tools */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"\"Versions/Current/\"\"${SPARKLE_RELAUNCH_TOOL_NAME}\"",
+				"\"Versions/Current/\"\"${SPARKLE_INSTALLER_PROGRESS_TOOL_NAME}\".app",
 			);
 			name = "Run Script: Link Tools";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"\"${TARGET_BUILD_DIR}\"/\"${FULL_PRODUCT_NAME}\"/\"${SPARKLE_RELAUNCH_TOOL_NAME}\"",
+				"\"${TARGET_BUILD_DIR}\"/\"${FULL_PRODUCT_NAME}\"/\"${SPARKLE_INSTALLER_PROGRESS_TOOL_NAME}\".app",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"$SRCROOT/Configurations/link-tools.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		895C5DC524D78E460058A82D /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
