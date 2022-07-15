@@ -11,7 +11,7 @@
 "%1$@ %2$@ is available but your macOS version is too old to install it. At least macOS %3$@ is required." = "%1$@ %2$@ is available but your macOS version is too old to install it. At least macOS %3$@ is required.";
 
 /* No comment provided by engineer. */
-"%1$@ can’t be updated if it’s running from the location it was downloaded to." = "%1$@ can’t be updated when it’s running from the location it was downloaded to.";
+"%1$@ can’t be updated if it’s running from the location it was downloaded to." = "%1$@ can’t be updated when it’s running from the location it was downloaded to. This is due to a security limitation imposed by Apple for apps that are downloaded from the web.";
 
 /* No comment provided by engineer. */
 "%1$@ can’t be updated, because it was opened from a read-only or a temporary location." = "%1$@ can’t be updated, because it was opened from a read-only or a temporary location.";
