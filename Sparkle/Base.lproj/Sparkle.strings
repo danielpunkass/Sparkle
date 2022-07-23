@@ -125,7 +125,7 @@
 "The update is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update is improperly signed and could not be validated. Please try again later or contact us.";
 
 /* No comment provided by engineer. */
-"Unable to Check For Updates" = "Unable to Check For Updates";
+"Unable to Check For Updates" = "Unable to Check for Updates";
 
 /* No comment provided by engineer. */
 "Update Error!" = "Update Error";
