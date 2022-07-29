@@ -81,7 +81,8 @@
         jobDictionary[@"EnableTransactions"] = @NO;
         jobDictionary[@"KeepAlive"] = @{@"SuccessfulExit" : @NO};
         jobDictionary[@"RunAtLoad"] = @NO;
-        jobDictionary[@"NICE"] = @0;
+        jobDictionary[@"Nice"] = @0;
+        jobDictionary[@"ProcessType"] = @"Interactive";
         jobDictionary[@"LaunchOnlyOnce"] = @YES;
         jobDictionary[@"MachServices"] = @{SPUStatusInfoServiceNameForBundleIdentifier(hostBundleIdentifier) : @YES};
         
@@ -211,7 +212,10 @@
                                 CFStringRef uti = (__bridge CFStringRef)[UTTypePNG identifier];
                                 imageDestination = CGImageDestinationCreateWithURL((CFURLRef)tempIconDestinationURL, uti, 1, NULL);
                             } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
                                 imageDestination = CGImageDestinationCreateWithURL((CFURLRef)tempIconDestinationURL, kUTTypePNG, 1, NULL);
+#pragma clang diagnostic pop
                             }
                             if (imageDestination != NULL) {
                                 CGImageDestinationAddImageFromSource(imageDestination, imageSource, imageIndex, (CFDictionaryRef)@{});
@@ -274,7 +278,7 @@
             }
         }
         
-        NSDictionary *jobDictionary = @{@"Label" : label, @"ProgramArguments" : arguments, @"EnableTransactions" : @NO, @"KeepAlive" : @{@"SuccessfulExit" : @NO}, @"RunAtLoad" : @NO, @"Nice" : @0, @"LaunchOnlyOnce": @YES, @"MachServices" : @{SPUInstallerServiceNameForBundleIdentifier(hostBundleIdentifier) : @YES, SPUProgressAgentServiceNameForBundleIdentifier(hostBundleIdentifier) : @YES}};
+        NSDictionary *jobDictionary = @{@"Label" : label, @"ProgramArguments" : arguments, @"EnableTransactions" : @NO, @"KeepAlive" : @{@"SuccessfulExit" : @NO}, @"RunAtLoad" : @NO, @"Nice" : @0, @"ProcessType": @"Interactive", @"LaunchOnlyOnce": @YES, @"MachServices" : @{SPUInstallerServiceNameForBundleIdentifier(hostBundleIdentifier) : @YES, SPUProgressAgentServiceNameForBundleIdentifier(hostBundleIdentifier) : @YES}};
         
         CFErrorRef submitError = NULL;
 #pragma clang diagnostic push

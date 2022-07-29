@@ -27,6 +27,7 @@ typedef NS_ENUM(int, CLIErrorExitStatus) {
     CLIErrorExitStatusUpdateCancelledAuthorization = 5,
     CLIErrorExitStatusUpdatePermissionRequested = 6,
     CLIErrorCodeCannotInstallInteractivePackageAsRoot = 7,
+    CLIErrorExitStatusInstallationWriteNoPermissionError = 8,
 };
 
 @interface SPUCommandLineDriver () <SPUUpdaterDelegate>
@@ -246,6 +247,13 @@ typedef NS_ENUM(int, CLIErrorExitStatus) {
     } else if (error.code == SUInstallationRootInteractiveError) {
         fprintf(stderr, "%s\n", error.localizedDescription.UTF8String);
         exit(CLIErrorCodeCannotInstallInteractivePackageAsRoot);
+    } else if (error.code == SUInstallationWriteNoPermissionError) {
+        fprintf(stderr, "Error: %s", error.localizedDescription.UTF8String);
+        if (error.localizedRecoverySuggestion != nil) {
+            fprintf(stderr, " %s", error.localizedRecoverySuggestion.UTF8String);
+        }
+        fprintf(stderr, "\n");
+        exit(CLIErrorExitStatusInstallationWriteNoPermissionError);
     } else {
         fprintf(stderr, "Error: Update has failed due to error %ld (%s). %s\n", (long)error.code, error.domain.UTF8String, error.localizedDescription.UTF8String);
         exit(EXIT_FAILURE);

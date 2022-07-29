@@ -32,15 +32,10 @@
 #import "SPUResumableUpdate.h"
 #import "SUSignatures.h"
 #import "SPUUserAgent+Private.h"
+#import "SPUGentleUserDriverReminders.h"
 
 
 #include "AppKitPrevention.h"
-
-@interface NSObject (SPUStandardUserDriverPrivate)
-
-- (void)_logGentleScheduledUpdateReminderWarningIfNeeded;
-
-@end
 
 NSString *const SUUpdaterDidFinishLoadingAppCastNotification = @"SUUpdaterDidFinishLoadingAppCastNotification";
 NSString *const SUUpdaterDidFindValidUpdateNotification = @"SUUpdaterDidFindValidUpdateNotification";
@@ -161,6 +156,10 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     
     if (![self checkIfConfiguredProperlyAndRequireFeedURL:NO validateXPCServices:YES error:error]) {
         return NO;
+    }
+    
+    if ([self.userDriver respondsToSelector:@selector(resetTimeSinceOpportuneUpdateNotice)]) {
+        [(id<SPUGentleUserDriverReminders>)self.userDriver resetTimeSinceOpportuneUpdateNotice];
     }
     
     self.startedUpdater = YES;
@@ -336,10 +335,11 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         }
     } else if (publicKeys.ed25519PubKey == nil) {
         // No EdDSA key is available, so app must be using DSA
-        if (updatingMainBundle && !self.loggedNoSecureKeyWarning) {
-            SULog(SULogLevelError, @"Error: Serving updates without an EdDSA key is insecure and deprecated. DSA support may be removed in a future Sparkle release. Please migrate to using EdDSA (ed25519). Visit Sparkle's documentation for migration information: https://sparkle-project.org/documentation/#3-segue-for-security-concerns");
-            
-            self.loggedNoSecureKeyWarning = YES;
+        if (updatingMainBundle) {
+            if (error != NULL) {
+                *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUNoPublicDSAFoundError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"For security reasons, updates need to be signed with an EdDSA key for %@. Please migrate to using EdDSA (ed25519). Visit Sparkle's documentation for migration information: https://sparkle-project.org/documentation/#3-segue-for-security-concerns.", hostName] }];
+            }
+            return NO;
         }
     }
     
@@ -508,8 +508,8 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
                     [self.delegate updater:self willScheduleUpdateCheckAfterDelay:delayUntilCheck];
                 }
                 
-                if ([self.userDriver respondsToSelector:@selector(_logGentleScheduledUpdateReminderWarningIfNeeded)]) {
-                    [(NSObject *)self.userDriver _logGentleScheduledUpdateReminderWarningIfNeeded];
+                if ([self.userDriver respondsToSelector:@selector(logGentleScheduledUpdateReminderWarningIfNeeded)]) {
+                    [(id<SPUGentleUserDriverReminders>)self.userDriver logGentleScheduledUpdateReminderWarningIfNeeded];
                 }
                 
                 [self.updaterTimer startAndFireAfterDelay:delayUntilCheck];
@@ -795,6 +795,12 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         return; // not even ready yet
     }
     
+    // Note this resets the opportune time when user grants Sparkle permission to check for updates
+    // and when the user changes preferences on automatically checking for updates or the update time check interval
+    if ([self.userDriver respondsToSelector:@selector(resetTimeSinceOpportuneUpdateNotice)]) {
+        [(id<SPUGentleUserDriverReminders>)self.userDriver resetTimeSinceOpportuneUpdateNotice];
+    }
+    
     if (!self.sessionInProgress) {
         [self cancelNextUpdateCycle];
         [self scheduleNextUpdateCheckFiringImmediately:NO usingCurrentDate:YES];
@@ -905,7 +911,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         SULog(SULogLevelError, @"Feed Error (%ld): %@", feedError.code, feedError.localizedDescription);
         return nil;
     }
-    return (NSURL* _Nonnull)feedURL;
+    return feedURL;
 }
 
 - (void)setSendsSystemProfile:(BOOL)sendsSystemProfile

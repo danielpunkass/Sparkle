@@ -85,7 +85,6 @@
 		61299A6009CA6EB100B7442F /* SUConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 61299A5F09CA6EB100B7442F /* SUConstants.m */; };
 		61299B3609CB04E000B7442F /* Sparkle.h in Headers */ = {isa = PBXBuildFile; fileRef = 61299B3509CB04E000B7442F /* Sparkle.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		612DCBB00D488BC60015DBEA /* SUUpdatePermissionPrompt.m in Sources */ = {isa = PBXBuildFile; fileRef = 612DCBAE0D488BC60015DBEA /* SUUpdatePermissionPrompt.m */; };
-		615AE3D00D64DC40001CA7BD /* SUModelTranslation.plist in Resources */ = {isa = PBXBuildFile; fileRef = 615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */; };
 		6196CFF909C72148000DC222 /* SUStatusController.h in Headers */ = {isa = PBXBuildFile; fileRef = 6196CFE309C71ADE000DC222 /* SUStatusController.h */; settings = {ATTRIBUTES = (); }; };
 		6196CFFA09C72149000DC222 /* SUStatusController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6196CFE409C71ADE000DC222 /* SUStatusController.m */; };
 		61A2259E0D1C495D00430CCD /* SUVersionComparisonProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 61A2259C0D1C495D00430CCD /* SUVersionComparisonProtocol.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -171,6 +170,7 @@
 		7229E1BA1C97CC4D00CB50D0 /* SPUScheduledUpdateDriver.m in Sources */ = {isa = PBXBuildFile; fileRef = 7229E1B81C97CC4D00CB50D0 /* SPUScheduledUpdateDriver.m */; };
 		7229E1BD1C98EFF200CB50D0 /* SPUDownloadDriver.h in Headers */ = {isa = PBXBuildFile; fileRef = 7229E1BB1C98EFF200CB50D0 /* SPUDownloadDriver.h */; };
 		7229E1BE1C98EFF200CB50D0 /* SPUDownloadDriver.m in Sources */ = {isa = PBXBuildFile; fileRef = 7229E1BC1C98EFF200CB50D0 /* SPUDownloadDriver.m */; };
+		722C9539286EA68C0033908A /* SPUGentleUserDriverReminders.h in Headers */ = {isa = PBXBuildFile; fileRef = 722C9538286EA54A0033908A /* SPUGentleUserDriverReminders.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		722FB7E5260EE53F00EB571C /* SUNormalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 722FB7E4260EE53F00EB571C /* SUNormalization.m */; };
 		722FB7E6260EE53F00EB571C /* SUNormalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 722FB7E4260EE53F00EB571C /* SUNormalization.m */; };
 		72316BD31E0DA8430039EFD9 /* SUUnarchiverNotifier.m in Sources */ = {isa = PBXBuildFile; fileRef = 72316BD21E0DA8430039EFD9 /* SUUnarchiverNotifier.m */; };
@@ -653,6 +653,55 @@
 			remoteGlobalIDString = 72B398D11D3D879300EE297F;
 			remoteInfo = Autoupdate;
 		};
+		72CCCC14287B3D1900E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8DC2EF4F0486A6940098B216;
+			remoteInfo = Sparkle;
+		};
+		72CCCC16287B3D3400E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E280E22B64522004AA304;
+			remoteInfo = bsdiff;
+		};
+		72CCCC18287B3D3D00E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E282C22B660BE004AA304;
+			remoteInfo = ed25519;
+		};
+		72CCCC1A287B3D9000E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E282C22B660BE004AA304;
+			remoteInfo = ed25519;
+		};
+		72CCCC1C287B3D9600E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E282C22B660BE004AA304;
+			remoteInfo = ed25519;
+		};
+		72CCCC1E287B3DA100E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E282C22B660BE004AA304;
+			remoteInfo = ed25519;
+		};
+		72CCCC20287B3DA400E7156B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA1E280E22B64522004AA304;
+			remoteInfo = bsdiff;
+		};
 		72D954B91CBB6E27006F28BD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
@@ -915,7 +964,6 @@
 		612DCBAE0D488BC60015DBEA /* SUUpdatePermissionPrompt.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SUUpdatePermissionPrompt.m; sourceTree = "<group>"; };
 		613151B20FB4946A000DCD59 /* is */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = is; path = is.lproj/Sparkle.strings; sourceTree = "<group>"; };
 		615409C4103BBC4000125AF1 /* cs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = cs; path = cs.lproj/Sparkle.strings; sourceTree = "<group>"; };
-		615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = SUModelTranslation.plist; sourceTree = "<group>"; };
 		6186554310D7484E00B1E074 /* pt-PT */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = "pt-PT"; path = "pt-PT.lproj/Sparkle.strings"; sourceTree = "<group>"; };
 		618915730E35937600B5E981 /* sv */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Sparkle.strings; sourceTree = "<group>"; };
 		6195D4920E404AD700D41A50 /* ru */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Sparkle.strings; sourceTree = "<group>"; };
@@ -1010,6 +1058,7 @@
 		7229E1B81C97CC4D00CB50D0 /* SPUScheduledUpdateDriver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SPUScheduledUpdateDriver.m; sourceTree = "<group>"; };
 		7229E1BB1C98EFF200CB50D0 /* SPUDownloadDriver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SPUDownloadDriver.h; sourceTree = "<group>"; };
 		7229E1BC1C98EFF200CB50D0 /* SPUDownloadDriver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SPUDownloadDriver.m; sourceTree = "<group>"; };
+		722C9538286EA54A0033908A /* SPUGentleUserDriverReminders.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SPUGentleUserDriverReminders.h; sourceTree = "<group>"; };
 		722FB7CA1DD69897001D40CE /* ConfigSwift.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ConfigSwift.xcconfig; sourceTree = "<group>"; };
 		722FB7E3260EE53F00EB571C /* SUNormalization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SUNormalization.h; sourceTree = "<group>"; };
 		722FB7E4260EE53F00EB571C /* SUNormalization.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SUNormalization.m; sourceTree = "<group>"; };
@@ -1715,7 +1764,6 @@
 				1420DF4F196247F900203BB0 /* Images.xcassets */,
 				14732BBC1960EFB500593899 /* README.markdown */,
 				14732BB91960EEEE00593899 /* SampleAppcast.xml */,
-				615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */,
 				1EAA4C8A2132C7BF00604473 /* ReleaseNotesColorStyle.css */,
 			);
 			path = Resources;
@@ -2159,6 +2207,7 @@
 				725CB9581C7121830064365A /* SPUStandardUserDriver.h */,
 				725CB9591C7121830064365A /* SPUStandardUserDriver.m */,
 				726E4A361C89116000C57C6A /* SPUStandardUserDriverDelegate.h */,
+				722C9538286EA54A0033908A /* SPUGentleUserDriverReminders.h */,
 				726DF88D1C84277500188804 /* SPUUserUpdateState.h */,
 				7269E49C2648FC6C0088C213 /* SPUUserUpdateState+Private.h */,
 				7269E4992648F7C00088C213 /* SPUUserUpdateState.m */,
@@ -2433,6 +2482,7 @@
 				7246E0A31C83B685003B4E75 /* SPUStandardUpdaterController.h in Headers */,
 				725CB95A1C7121830064365A /* SPUStandardUserDriver.h in Headers */,
 				726E4A371C89116000C57C6A /* SPUStandardUserDriverDelegate.h in Headers */,
+				722C9539286EA68C0033908A /* SPUGentleUserDriverReminders.h in Headers */,
 				729F7EAF273F1840004592DC /* SPUUserAgent+Private.h in Headers */,
 				72EE17FC26D1CC9D00C58B19 /* SPUInstallationType.h in Headers */,
 				72EF30BE2675CF38008CE987 /* SPUAppcastItemStateResolver.h in Headers */,
@@ -2571,6 +2621,8 @@
 			buildRules = (
 			);
 			dependencies = (
+				72CCCC19287B3D3D00E7156B /* PBXTargetDependency */,
+				72CCCC17287B3D3400E7156B /* PBXTargetDependency */,
 				61B5F91C09C4CF7200B25A18 /* PBXTargetDependency */,
 				726E4A201C86C88F00C57C6A /* PBXTargetDependency */,
 			);
@@ -2590,6 +2642,8 @@
 			buildRules = (
 			);
 			dependencies = (
+				72CCCC21287B3DA400E7156B /* PBXTargetDependency */,
+				72CCCC1F287B3DA100E7156B /* PBXTargetDependency */,
 			);
 			name = generate_appcast;
 			packageProductDependencies = (
@@ -2712,6 +2766,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				72CCCC15287B3D1900E7156B /* PBXTargetDependency */,
 			);
 			name = TestAppHelper;
 			productName = TestAppHelper;
@@ -2830,6 +2885,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				72CCCC1B287B3D9000E7156B /* PBXTargetDependency */,
 			);
 			name = generate_keys;
 			packageProductDependencies = (
@@ -2850,6 +2906,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				72CCCC1D287B3D9600E7156B /* PBXTargetDependency */,
 			);
 			name = sign_update;
 			packageProductDependencies = (
@@ -3130,7 +3187,6 @@
 				61AAE8280A321A7F00D8810D /* Sparkle.strings in Resources */,
 				1EAA4C8B2132C7BF00604473 /* ReleaseNotesColorStyle.css in Resources */,
 				723ABD38259A9BA500BDB4FA /* SUUpdateAlert.xib in Resources */,
-				615AE3D00D64DC40001CA7BD /* SUModelTranslation.plist in Resources */,
 				55C14BEF136EF21700649790 /* SUStatus.xib in Resources */,
 				723ABD6C259A9CBC00BDB4FA /* SUUpdatePermissionPrompt.xib in Resources */,
 			);
@@ -3728,6 +3784,41 @@
 			isa = PBXTargetDependency;
 			target = 72B398D11D3D879300EE297F /* Autoupdate */;
 			targetProxy = 72A5D5AB1D6929260009E5AC /* PBXContainerItemProxy */;
+		};
+		72CCCC15287B3D1900E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8DC2EF4F0486A6940098B216 /* Sparkle */;
+			targetProxy = 72CCCC14287B3D1900E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC17287B3D3400E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E280E22B64522004AA304 /* bsdiff */;
+			targetProxy = 72CCCC16287B3D3400E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC19287B3D3D00E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E282C22B660BE004AA304 /* ed25519 */;
+			targetProxy = 72CCCC18287B3D3D00E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC1B287B3D9000E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E282C22B660BE004AA304 /* ed25519 */;
+			targetProxy = 72CCCC1A287B3D9000E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC1D287B3D9600E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E282C22B660BE004AA304 /* ed25519 */;
+			targetProxy = 72CCCC1C287B3D9600E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC1F287B3DA100E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E282C22B660BE004AA304 /* ed25519 */;
+			targetProxy = 72CCCC1E287B3DA100E7156B /* PBXContainerItemProxy */;
+		};
+		72CCCC21287B3DA400E7156B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA1E280E22B64522004AA304 /* bsdiff */;
+			targetProxy = 72CCCC20287B3DA400E7156B /* PBXContainerItemProxy */;
 		};
 		72D954BA1CBB6E27006F28BD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
