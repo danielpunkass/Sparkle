@@ -1,3 +1,0 @@
-[submodule "Vendor/ed25519"]
-	path = Vendor/ed25519
-	url = https://github.com/danielpunkass/ed25519
