@@ -6,15 +6,28 @@
 import Foundation
 import UniformTypeIdentifiers
 
+struct UpdateBranch: Hashable {
+    let minimumSystemVersion: String?
+    let maximumSystemVersion: String?
+    let minimumAutoupdateVersion: String?
+    let channel: String?
+}
+
 class DeltaUpdate {
     let fromVersion: String
     let archivePath: URL
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
     var dsaSignature: String?
+#endif
     var edSignature: String?
+    let sparkleExecutableFileSize: Int?
+    let sparkleLocales: String?
 
-    init(fromVersion: String, archivePath: URL) {
+    init(fromVersion: String, archivePath: URL, sparkleExecutableFileSize: Int?, sparkleLocales: String?) {
         self.archivePath = archivePath
         self.fromVersion = fromVersion
+        self.sparkleExecutableFileSize = sparkleExecutableFileSize
+        self.sparkleLocales = sparkleLocales
     }
 
     var fileSize: Int64 {
@@ -44,7 +57,7 @@ class DeltaUpdate {
         
         let _ = try? fileManager.removeItem(at: tempApplyToPath)
 
-        return DeltaUpdate(fromVersion: from.version, archivePath: archivePath)
+        return DeltaUpdate(fromVersion: from.version, archivePath: archivePath, sparkleExecutableFileSize: from.sparkleExecutableFileSize, sparkleLocales: from.sparkleLocales)
     }
 }
 
@@ -54,6 +67,8 @@ class ArchiveItem: CustomStringConvertible {
     let _shortVersion: String?
     let minimumSystemVersion: String
     let frameworkVersion: String?
+    let sparkleExecutableFileSize: Int?
+    let sparkleLocales: String?
     let archivePath: URL
     let appPath: URL
     let feedURL: URL?
@@ -62,17 +77,22 @@ class ArchiveItem: CustomStringConvertible {
     let archiveFileAttributes: [FileAttributeKey: Any]
     var deltas: [DeltaUpdate]
 
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
     var dsaSignature: String?
+#endif
     var edSignature: String?
     var downloadUrlPrefix: URL?
     var releaseNotesURLPrefix: URL?
+    var signingError: Error?
 
-    init(version: String, shortVersion: String?, feedURL: URL?, minimumSystemVersion: String?, frameworkVersion: String?, publicEdKey: String?, supportsDSA: Bool, appPath: URL, archivePath: URL) throws {
+    init(version: String, shortVersion: String?, feedURL: URL?, minimumSystemVersion: String?, frameworkVersion: String?, sparkleExecutableFileSize: Int?, sparkleLocales: String?, publicEdKey: String?, supportsDSA: Bool, appPath: URL, archivePath: URL) throws {
         self.version = version
         self._shortVersion = shortVersion
         self.feedURL = feedURL
         self.minimumSystemVersion = minimumSystemVersion ?? "10.13"
         self.frameworkVersion = frameworkVersion
+        self.sparkleExecutableFileSize = sparkleExecutableFileSize
+        self.sparkleLocales = sparkleLocales
         self.archivePath = archivePath
         self.appPath = appPath
         self.supportsDSA = supportsDSA
@@ -126,7 +146,11 @@ class ArchiveItem: CustomStringConvertible {
             }
             let shortVersion = infoPlist["CFBundleShortVersionString"] as? String
             let publicEdKey = infoPlist[SUPublicEDKeyKey] as? String
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
             let supportsDSA = infoPlist[SUPublicDSAKeyKey] != nil || infoPlist[SUPublicDSAKeyFileKey] != nil
+#else
+            let supportsDSA = false
+#endif
 
             var feedURL: URL?
             if let feedURLStr = infoPlist["SUFeedURL"] as? String {
@@ -138,24 +162,83 @@ class ArchiveItem: CustomStringConvertible {
             }
             
             var frameworkVersion: String? = nil
+            let sparkleExecutableFileSize: Int?
+            let sparkleLocales: String?
             do {
                 let canonicalFrameworksURL = appPath.appendingPathComponent("Contents/Frameworks/Sparkle.framework")
                 
                 let frameworksURL: URL?
+                let usingLegacySparkleCore: Bool
                 if !FileManager.default.fileExists(atPath: canonicalFrameworksURL.path) {
                     // Try legacy SparkleCore framework that was shipping in early 2.0 betas
                     let sparkleCoreFrameworksURL = appPath.appendingPathComponent("Contents/Frameworks/SparkleCore.framework")
                     if FileManager.default.fileExists(atPath: sparkleCoreFrameworksURL.path) {
                         frameworksURL = sparkleCoreFrameworksURL
+                        usingLegacySparkleCore = true
                     } else {
                         frameworksURL = nil
+                        usingLegacySparkleCore = false
                     }
                 } else {
                     frameworksURL = canonicalFrameworksURL
+                    usingLegacySparkleCore = false
                 }
                 
-                if let frameworksURL = frameworksURL, let frameworkInfoPlist = NSDictionary(contentsOf: frameworksURL.appendingPathComponent("Resources/Info.plist")) {
-                    frameworkVersion = frameworkInfoPlist[kCFBundleVersionKey as String] as? String
+                if let frameworksURL = frameworksURL {
+                    let resourcesURL = frameworksURL.appendingPathComponent("Resources").resolvingSymlinksInPath()
+                    
+                    if let frameworkInfoPlist = NSDictionary(contentsOf: resourcesURL.appendingPathComponent("Info.plist")) {
+                        frameworkVersion = frameworkInfoPlist[kCFBundleVersionKey as String] as? String
+                    }
+                    
+                    let frameworkExecutableURL = frameworksURL.appendingPathComponent(!usingLegacySparkleCore ? "Sparkle" : "SparkleCore").resolvingSymlinksInPath()
+                    do {
+                        let resourceValues = try frameworkExecutableURL.resourceValues(forKeys: [.fileSizeKey])
+                        
+                        sparkleExecutableFileSize = resourceValues.fileSize
+                    } catch {
+                        sparkleExecutableFileSize = nil
+                    }
+                    
+                    do {
+                        let fileManager = FileManager.default
+                        let resourcesDirectoryContents = try fileManager.contentsOfDirectory(atPath: resourcesURL.path)
+                        let localeExtension = ".lproj"
+                        let localeExtensionCount = localeExtension.count
+                        let maxLocalesToProcess = 7
+                        var localesPresent: [String] = []
+                        var localeIndex = 0
+                        for filename in resourcesDirectoryContents {
+                            guard filename.hasSuffix(localeExtension) else {
+                                continue
+                            }
+                            
+                            // English and Base directories are the least likely to be stripped,
+                            // so let's not bother recording them.
+                            guard filename != "en" && filename != "Base" else {
+                                continue
+                            }
+                            
+                            let locale = String(filename.dropLast(localeExtensionCount))
+                            localesPresent.append(locale)
+                            localeIndex += 1
+                            
+                            if localeIndex >= maxLocalesToProcess {
+                                break
+                            }
+                        }
+                        
+                        if localesPresent.count > 0 {
+                            sparkleLocales = localesPresent.joined(separator: ",")
+                        } else {
+                            sparkleLocales = nil
+                        }
+                    } catch {
+                        sparkleLocales = nil
+                    }
+                } else {
+                    sparkleExecutableFileSize = nil
+                    sparkleLocales = nil
                 }
             }
 
@@ -164,6 +247,8 @@ class ArchiveItem: CustomStringConvertible {
                           feedURL: feedURL,
                           minimumSystemVersion: infoPlist["LSMinimumSystemVersion"] as? String,
                           frameworkVersion: frameworkVersion,
+                          sparkleExecutableFileSize: sparkleExecutableFileSize,
+                          sparkleLocales: sparkleLocales,
                           publicEdKey: publicEdKey,
                           supportsDSA: supportsDSA,
                           appPath: appPath,
@@ -211,37 +296,50 @@ class ArchiveItem: CustomStringConvertible {
         if basename.pathExtension == "tar" { // tar.gz
             basename = basename.deletingPathExtension()
         }
-        let releaseNotes = basename.appendingPathExtension("html")
-        if !FileManager.default.fileExists(atPath: releaseNotes.path) {
-            return nil
+        
+        let htmlReleaseNotes = basename.appendingPathExtension("html")
+        if FileManager.default.fileExists(atPath: htmlReleaseNotes.path) {
+            return htmlReleaseNotes
         }
-        return releaseNotes
+        
+        let plainTextReleaseNotes = basename.appendingPathExtension("txt")
+        if FileManager.default.fileExists(atPath: plainTextReleaseNotes.path) {
+            return plainTextReleaseNotes
+        }
+        
+        return nil
     }
 
-    private func getReleaseNotesAsHTMLFragment(_ path: URL, _ maxCDATAThreshold: Int) -> String?  {
-        if let html = try? String(contentsOf: path) {
-            if html.utf8.count <= maxCDATAThreshold &&
-                !html.localizedCaseInsensitiveContains("<!DOCTYPE") &&
-                !html.localizedCaseInsensitiveContains("<body") {
-                return html
-            }
+    private func getReleaseNotesAsFragment(_ path: URL, _ embedReleaseNotesAlways: Bool) -> (content: String, format: String)?  {
+        guard let content = try? String(contentsOf: path) else {
+            return nil
         }
-        return nil
+        
+        let format = (path.pathExtension.caseInsensitiveCompare("txt") == .orderedSame) ? "plain-text" : "html"
+        
+        if embedReleaseNotesAlways {
+            return (content, format)
+        } else if path.pathExtension.caseInsensitiveCompare("html") == .orderedSame && !content.localizedCaseInsensitiveContains("<!DOCTYPE") && !content.localizedCaseInsensitiveContains("<body")  {
+            // HTML fragments should always be embedded
+            return (content, format)
+        } else {
+            return nil
+        }
     }
     
-    func releaseNotesHTML(maxCDATAThreshold: Int) -> String? {
+    func releaseNotesContent(embedReleaseNotesAlways: Bool) -> (content: String, format: String)? {
         if let path = self.releaseNotesPath {
-            return self.getReleaseNotesAsHTMLFragment(path, maxCDATAThreshold)
+            return self.getReleaseNotesAsFragment(path, embedReleaseNotesAlways)
         }
         return nil
     }
     
-    func releaseNotesURL(maxCDATAThreshold: Int) -> URL? {
+    func releaseNotesURL(embedReleaseNotesAlways: Bool) -> URL? {
         guard let path = self.releaseNotesPath else {
             return nil
         }
         // The file is already used as inline description
-        if self.getReleaseNotesAsHTMLFragment(path, maxCDATAThreshold) != nil {
+        if self.getReleaseNotesAsFragment(path, embedReleaseNotesAlways) != nil {
             return nil
         }
         return self.releaseNoteURL(for: path.lastPathComponent)
@@ -268,10 +366,23 @@ class ArchiveItem: CustomStringConvertible {
         }
         var localizedReleaseNotes = [(String, URL)]()
         for languageCode in Locale.isoLanguageCodes {
-            let localizedReleaseNoteURL = basename
+            let baseLocalizedReleaseNoteURL = basename
                 .appendingPathExtension(languageCode)
-                .appendingPathExtension("html")
-            if (try? localizedReleaseNoteURL.checkResourceIsReachable()) ?? false,
+            
+            let htmlLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("html")
+            let plainTextLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("txt")
+            
+            let localizedReleaseNoteURL: URL?
+            
+            if (try? htmlLocalizedReleaseNoteURL.checkResourceIsReachable()) ?? false {
+                localizedReleaseNoteURL = htmlLocalizedReleaseNoteURL
+            } else if (try? plainTextLocalizedReleaseNoteURL.checkResourceIsReachable()) ?? false {
+                localizedReleaseNoteURL = plainTextLocalizedReleaseNoteURL
+            } else {
+                localizedReleaseNoteURL = nil
+            }
+            
+            if let localizedReleaseNoteURL = localizedReleaseNoteURL,
                let localizedReleaseNoteRemoteURL = self.releaseNoteURL(for: localizedReleaseNoteURL.lastPathComponent)
             {
                 localizedReleaseNotes.append((languageCode, localizedReleaseNoteRemoteURL))

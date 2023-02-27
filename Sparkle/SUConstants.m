@@ -41,10 +41,11 @@ NSString *const SUSkippedMajorVersionKey = @"SUSkippedMajorVersion";
 NSString *const SUSkippedMajorSubreleaseVersionKey = @"SUSkippedMajorSubreleaseVersion";
 NSString *const SUScheduledCheckIntervalKey = @"SUScheduledCheckInterval";
 NSString *const SULastCheckTimeKey = @"SULastCheckTime";
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
 NSString *const SUExpectsDSASignatureKey = @"SUExpectsDSASignature";
-NSString *const SUExpectsEDSignatureKey = @"SUExpectsEDSignatureKey";
 NSString *const SUPublicDSAKeyKey = @"SUPublicDSAKey";
 NSString *const SUPublicDSAKeyFileKey = @"SUPublicDSAKeyFile";
+#endif
 NSString *const SUPublicEDKeyKey = @"SUPublicEDKey";
 NSString *const SUAutomaticallyUpdateKey = @"SUAutomaticallyUpdate";
 NSString *const SUAllowsAutomaticUpdatesKey = @"SUAllowsAutomaticUpdates";
@@ -72,12 +73,17 @@ NSString *const SUNormalizeInstalledApplicationNameKey = @"SUNormalizeInstalledA
 NSString *const SURelaunchToolNameKey = @"SURelaunchToolName";
 
 NSString *const SUAppcastAttributeDeltaFrom = @"sparkle:deltaFrom";
+NSString *const SUAppcastAttributeDeltaFromSparkleExecutableSize = @"sparkle:deltaFromSparkleExecutableSize";
+NSString *const SUAppcastAttributeDeltaFromSparkleLocales = @"sparkle:deltaFromSparkleLocales";
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
 NSString *const SUAppcastAttributeDSASignature = @"sparkle:dsaSignature";
+#endif
 NSString *const SUAppcastAttributeEDSignature = @"sparkle:edSignature";
 NSString *const SUAppcastAttributeShortVersionString = @"sparkle:shortVersionString";
 NSString *const SUAppcastAttributeVersion = @"sparkle:version";
 NSString *const SUAppcastAttributeOsType = @"sparkle:os";
 NSString *const SUAppcastAttributeInstallationType = @"sparkle:installationType";
+NSString *const SUAppcastAttributeFormat = @"sparkle:format";
 
 NSString *const SUAppcastElementVersion = SUAppcastAttributeVersion;
 NSString *const SUAppcastElementShortVersionString = SUAppcastAttributeShortVersionString;

@@ -45,10 +45,11 @@ extern NSString *const SUSkippedMajorVersionKey;
 extern NSString *const SUSkippedMajorSubreleaseVersionKey;
 extern NSString *const SUScheduledCheckIntervalKey;
 extern NSString *const SULastCheckTimeKey;
+#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
 extern NSString *const SUExpectsDSASignatureKey;
-extern NSString *const SUExpectsEDSignatureKey;
 extern NSString *const SUPublicDSAKeyKey;
 extern NSString *const SUPublicDSAKeyFileKey;
+#endif
 extern NSString *const SUPublicEDKeyKey;
 extern NSString *const SUAutomaticallyUpdateKey;
 extern NSString *const SUAllowsAutomaticUpdatesKey;
@@ -75,12 +76,15 @@ extern NSString *const SURelaunchToolNameKey __attribute__((deprecated("This key
 // -----------------------------------------------------------------------------
 
 extern NSString *const SUAppcastAttributeDeltaFrom;
+extern NSString *const SUAppcastAttributeDeltaFromSparkleExecutableSize;
+extern NSString *const SUAppcastAttributeDeltaFromSparkleLocales;
 extern NSString *const SUAppcastAttributeDSASignature;
 extern NSString *const SUAppcastAttributeEDSignature;
 extern NSString *const SUAppcastAttributeShortVersionString;
 extern NSString *const SUAppcastAttributeVersion;
 extern NSString *const SUAppcastAttributeOsType;
 extern NSString *const SUAppcastAttributeInstallationType;
+extern NSString *const SUAppcastAttributeFormat;
 
 extern NSString *const SUAppcastElementVersion;
 extern NSString *const SUAppcastElementShortVersionString;

@@ -13,7 +13,6 @@
 #import "SUAppcastItem+Private.h"
 #import "SUVersionComparisonProtocol.h"
 #import "SUStandardVersionComparator.h"
-#import "SUOperatingSystem.h"
 #import "SPUUpdaterDelegate.h"
 #import "SUHost.h"
 #import "SPUSkippedUpdate.h"
@@ -32,25 +31,17 @@
 #include "AppKitPrevention.h"
 
 @interface SUAppcastDriver () <SPUDownloadDriverDelegate>
-
-@property (nonatomic, readonly) SUHost *host;
-@property (nonatomic, readonly, weak) id updater;
-@property (nullable, nonatomic, readonly, weak) id <SPUUpdaterDelegate> updaterDelegate;
-@property (nullable, nonatomic, readonly, weak) id <SUAppcastDriverDelegate> delegate;
-@property (nonatomic) SPUDownloadDriver *downloadDriver;
-
 @end
 
 @implementation SUAppcastDriver
 {
-    NSNumber * _Nullable _hostSupportsDeltaUpdates; // BOOL
+    SUHost *_host;
+    SPUDownloadDriver *_downloadDriver;
+    
+    __weak id _updater;
+    __weak id <SPUUpdaterDelegate> _updaterDelegate;
+    __weak id <SUAppcastDriverDelegate> _delegate;
 }
-
-@synthesize host = _host;
-@synthesize updater = _updater;
-@synthesize updaterDelegate = _updaterDelegate;
-@synthesize delegate = _delegate;
-@synthesize downloadDriver = _downloadDriver;
 
 - (instancetype)initWithHost:(SUHost *)host updater:(id)updater updaterDelegate:(id <SPUUpdaterDelegate>)updaterDelegate delegate:(id <SUAppcastDriverDelegate>)delegate
 {
@@ -72,28 +63,28 @@
     }
     requestHTTPHeaders[@"Accept"] = @"application/rss+xml,*/*;q=0.1";
     
-    self.downloadDriver = [[SPUDownloadDriver alloc] initWithRequestURL:appcastURL host:self.host userAgent:userAgent httpHeaders:requestHTTPHeaders inBackground:background delegate:self];
+    _downloadDriver = [[SPUDownloadDriver alloc] initWithRequestURL:appcastURL host:_host userAgent:userAgent httpHeaders:requestHTTPHeaders inBackground:background delegate:self];
     
-    [self.downloadDriver downloadFile];
+    [_downloadDriver downloadFile];
 }
 
 - (void)downloadDriverDidDownloadData:(SPUDownloadData *)downloadData
 {
-    SPUAppcastItemStateResolver *stateResolver = [[SPUAppcastItemStateResolver alloc] initWithHostVersion:self.host.version applicationVersionComparator:[self versionComparator] standardVersionComparator:[SUStandardVersionComparator defaultComparator]];
+    SPUAppcastItemStateResolver *stateResolver = [[SPUAppcastItemStateResolver alloc] initWithHostVersion:_host.version applicationVersionComparator:[self versionComparator] standardVersionComparator:[SUStandardVersionComparator defaultComparator]];
  
     NSError *appcastError = nil;
     SUAppcast *appcast = [[SUAppcast alloc] initWithXMLData:downloadData.data relativeToURL:downloadData.URL stateResolver:stateResolver error:&appcastError];
     
     if (appcast == nil) {
-        NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObject:SULocalizedString(@"An error occurred while parsing the update feed.", nil) forKey:NSLocalizedDescriptionKey];
+        NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObject:SULocalizedStringFromTableInBundle(@"An error occurred while parsing the update feed.", SPARKLE_TABLE, SUSparkleBundle(), nil) forKey:NSLocalizedDescriptionKey];
         
         if (appcastError != nil) {
             [userInfo setObject:appcastError forKey:NSUnderlyingErrorKey];
         }
         
-        [self.delegate didFailToFetchAppcastWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUAppcastParseError userInfo:userInfo]];
+        [_delegate didFailToFetchAppcastWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUAppcastParseError userInfo:userInfo]];
     } else {
-        [self appcastDidFinishLoading:appcast inBackground:self.downloadDriver.inBackground];
+        [self appcastDidFinishLoading:appcast inBackground:_downloadDriver.inBackground];
     }
 }
 
@@ -101,36 +92,40 @@
 {
     SULog(SULogLevelError, @"Encountered download feed error: %@", error);
 
-    NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithDictionary:@{NSLocalizedDescriptionKey:SULocalizedString(@"An error occurred in retrieving update information. Please try again later.", nil)}];
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithDictionary:@{NSLocalizedDescriptionKey:SULocalizedStringFromTableInBundle(@"An error occurred in retrieving update information. Please try again later.", SPARKLE_TABLE, SUSparkleBundle(), nil)}];
     
     if (error != nil) {
         [userInfo setObject:error forKey:NSUnderlyingErrorKey];
     }
     
-    [self.delegate didFailToFetchAppcastWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUDownloadError userInfo:userInfo]];
+    [_delegate didFailToFetchAppcastWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUDownloadError userInfo:userInfo]];
 }
 
-- (SUAppcastItem * _Nullable)preferredUpdateForRegularAppcastItem:(SUAppcastItem * _Nullable)regularItem secondaryUpdate:(SUAppcastItem * __autoreleasing _Nullable *)secondaryUpdate
+- (SUAppcastItem * _Nullable)preferredUpdateForRegularAppcastItem:(SUAppcastItem * _Nullable)regularItem secondaryUpdate:(SUAppcastItem * __autoreleasing _Nullable *)secondaryUpdate SPU_OBJC_DIRECT
 {
-    SUAppcastItem *deltaItem = (regularItem != nil) ? [[self class] deltaUpdateFromAppcastItem:regularItem hostVersion:self.host.version] : nil;
+    SUAppcastItem *deltaItem = (regularItem != nil) ? [[self class] deltaUpdateFromAppcastItem:regularItem hostVersion:_host.version] : nil;
     
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdirect-ivar-access"
-    if (deltaItem != nil && _hostSupportsDeltaUpdates == nil) {
+    BOOL supportsDeltaItem;
+    if (deltaItem == nil) {
+        supportsDeltaItem = NO;
+    } else {
         // Delta updates are not supported when bundles are transferred over to some file systems like fat32 and exfat systems
         // This is because they do not preserve permissions completely, which we require for diff'ing.
         // We shouldn't download delta updates in cases where we can detect they aren't supported
         // More accurately we will detect if the host bundle's permission bits have been 'tainted'
         // which is more reliable than checking the underlying file system.
         // To do this, we will check the Sparkle executable's permission bits, which is produced from us
+        // We will also check if the executable file or the localization files have been stripped from Sparkle.framework
         
         NSFileManager *fileManager = NSFileManager.defaultManager;
         
-        NSBundle *hostBundle = self.host.bundle;
+        NSBundle *hostBundle = _host.bundle;
         NSString *sparkleExecutablePath;
+        NSString *sparkleResourcesPath;
         if ([hostBundle isEqual:NSBundle.mainBundle]) {
             NSBundle *sparkleBundle = [NSBundle bundleForClass:[self class]];
             sparkleExecutablePath = sparkleBundle.executableURL.URLByResolvingSymlinksInPath.path;
+            sparkleResourcesPath = sparkleBundle.resourcePath;
         } else {
             // If we are not updating ourselves, make a good guess to the Sparkle executable location
             NSURL *frameworksURL = hostBundle.privateFrameworksURL;
@@ -139,40 +134,79 @@
             
             if ([fileManager fileExistsAtPath:candidateExecutablePath]) {
                 sparkleExecutablePath = candidateExecutablePath;
+                sparkleResourcesPath = [candidateExecutablePath.stringByDeletingLastPathComponent stringByAppendingPathComponent:@"Resources"];
             } else {
                 sparkleExecutablePath = nil;
+                sparkleResourcesPath = nil;
             }
         }
         
-        // Only skip delta updates if permissions are not 0755
-        BOOL hostSupportsDeltaUpdates;
         if (sparkleExecutablePath != nil) {
             NSError *attributesError = nil;
             NSDictionary<NSFileAttributeKey, id> *attributes = [fileManager attributesOfItemAtPath:sparkleExecutablePath error:&attributesError];
+            
+            BOOL sparkleExecutableIsOK;
             if (attributes != nil) {
+                // Skip delta updates if permissions are not 0755
                 NSNumber *posixPermissions = attributes[NSFilePosixPermissions];
                 if (posixPermissions != nil && posixPermissions.shortValue != 0755) {
-                    hostSupportsDeltaUpdates = NO;
+                    sparkleExecutableIsOK = NO;
                     
+                    // Irregular permissions on the Sparkle executable could mean the app was transferred on a file system we don't support
+                    // (which doesn't track all permissions)
                     SULog(SULogLevelDefault, @"Encountered irregular POSIX permissions 0%o for Sparkle executable, which is not 0755. Skipping delta updates..", posixPermissions.shortValue);
                 } else {
-                    hostSupportsDeltaUpdates = YES;
+                    // Test if Sparkle's executable file on disk has expected file size for applying this delta update
+                    // If the file size has been reduced, the user could have stripped an architecture out
+                    if (deltaItem.deltaFromSparkleExecutableSize != nil) {
+                        NSNumber *fileSize = attributes[NSFileSize];
+                        if (fileSize != nil && ![deltaItem.deltaFromSparkleExecutableSize isEqualToNumber:fileSize]) {
+                            sparkleExecutableIsOK = NO;
+                            
+                            SULog(SULogLevelDefault, @"Expected file size (%lld) of Sparkle's executable does not match actual file size (%lld). Skipping delta update.", deltaItem.deltaFromSparkleExecutableSize.unsignedLongLongValue, fileSize.unsignedLongLongValue);
+                        } else {
+                            sparkleExecutableIsOK = YES;
+                        }
+                    } else {
+                        sparkleExecutableIsOK = YES;
+                    }
                 }
             } else {
-                hostSupportsDeltaUpdates = YES;
+                sparkleExecutableIsOK = YES;
                 
                 SULog(SULogLevelError, @"Error: Failed to retrieve attributes from Sparkle executable: %@", attributesError.localizedDescription);
             }
+            
+            // Test if Sparkle's expected localization files on disk are still present for applying this delta update
+            // If there are missing localization files, the user could have stripped them out
+            // No need to test this though if !sparkleExecutableIsOK
+            BOOL sparkleResourcesAreOK;
+            if (sparkleExecutableIsOK && sparkleResourcesPath != nil && deltaItem.deltaFromSparkleLocales != nil) {
+                BOOL foundAllExpectedLocales = YES;
+                for (NSString *locale in deltaItem.deltaFromSparkleLocales) {
+                    NSString *localeProjectPath = [[sparkleResourcesPath stringByAppendingPathComponent:locale] stringByAppendingPathExtension:@"lproj"];
+                    if (![fileManager fileExistsAtPath:localeProjectPath]) {
+                        foundAllExpectedLocales = NO;
+                        
+                        SULog(SULogLevelDefault, @"Expected project locale (%@) is missing in Sparkle.framework. Skipping delta update.", locale);
+                        break;
+                    }
+                }
+                
+                sparkleResourcesAreOK = foundAllExpectedLocales;
+            } else {
+                sparkleResourcesAreOK = YES;
+            }
+            
+            supportsDeltaItem = sparkleExecutableIsOK && sparkleResourcesAreOK;
         } else {
-            hostSupportsDeltaUpdates = YES;
+            supportsDeltaItem = YES;
             
             SULog(SULogLevelError, @"Error: Failed to unexpectably retrieve Sparkle executable URL from %@", hostBundle.bundlePath);
         }
-        
-        _hostSupportsDeltaUpdates = @(hostSupportsDeltaUpdates);
     }
     
-    if (deltaItem != nil && _hostSupportsDeltaUpdates.boolValue) {
+    if (supportsDeltaItem) {
         if (secondaryUpdate != NULL) {
             *secondaryUpdate = regularItem;
         }
@@ -183,17 +217,18 @@
         }
         return regularItem;
     }
-#pragma clang diagnostic pop
 }
 
-- (SUAppcastItem *)retrieveBestAppcastItemFromAppcast:(SUAppcast *)appcast versionComparator:(id<SUVersionComparison>)versionComparator secondaryUpdate:(SUAppcastItem * __autoreleasing _Nullable *)secondaryAppcastItem
+- (SUAppcastItem *)retrieveBestAppcastItemFromAppcast:(SUAppcast *)appcast versionComparator:(id<SUVersionComparison>)versionComparator secondaryUpdate:(SUAppcastItem * __autoreleasing _Nullable *)secondaryAppcastItem SPU_OBJC_DIRECT
 {
     // Find the best valid update in the appcast by asking the delegate
     // Don't ask the delegate if the appcast has no items though
+    id <SPUUpdaterDelegate> updaterDelegate = _updaterDelegate;
+    id updater = _updater;
     SUAppcastItem *regularItemFromDelegate;
     BOOL delegateOptedOutOfSelection;
-    if (appcast.items.count > 0 && [self.updaterDelegate respondsToSelector:@selector((bestValidUpdateInAppcast:forUpdater:))]) {
-        SUAppcastItem *candidateItem = [self.updaterDelegate bestValidUpdateInAppcast:appcast forUpdater:(id _Nonnull)self.updater];
+    if (appcast.items.count > 0 && updater != nil && [updaterDelegate respondsToSelector:@selector((bestValidUpdateInAppcast:forUpdater:))]) {
+        SUAppcastItem *candidateItem = [updaterDelegate bestValidUpdateInAppcast:appcast forUpdater:updater];
         
         if (candidateItem == SUAppcastItem.emptyAppcastItem) {
             regularItemFromDelegate = nil;
@@ -221,7 +256,7 @@
     // Take care of finding best appcast item ourselves if delegate does not
     SUAppcastItem *regularItem;
     if (regularItemFromDelegate == nil && !delegateOptedOutOfSelection) {
-        regularItem = [[self class] bestItemFromAppcastItems:appcast.items comparator:versionComparator];
+        regularItem = [SUAppcastDriver bestItemFromAppcastItems:appcast.items comparator:versionComparator];
     } else {
         regularItem = regularItemFromDelegate;
     }
@@ -232,16 +267,21 @@
     return [self preferredUpdateForRegularAppcastItem:regularItem secondaryUpdate:secondaryAppcastItem];
 }
 
-- (void)appcastDidFinishLoading:(SUAppcast *)loadedAppcast inBackground:(BOOL)background
+- (void)appcastDidFinishLoading:(SUAppcast *)loadedAppcast inBackground:(BOOL)background SPU_OBJC_DIRECT
 {
-    [self.delegate didFinishLoadingAppcast:loadedAppcast];
+    id<SUAppcastDriverDelegate> delegate = _delegate;
+    [delegate didFinishLoadingAppcast:loadedAppcast];
     
-    NSDictionary *userInfo = @{ SUUpdaterAppcastNotificationKey: loadedAppcast };
-    [[NSNotificationCenter defaultCenter] postNotificationName:SUUpdaterDidFinishLoadingAppCastNotification object:self.updater userInfo:userInfo];
+    id updater = _updater;
+    if (updater != nil) {
+        NSDictionary *userInfo = @{ SUUpdaterAppcastNotificationKey: loadedAppcast };
+        [[NSNotificationCenter defaultCenter] postNotificationName:SUUpdaterDidFinishLoadingAppCastNotification object:updater userInfo:userInfo];
+    }
     
     NSSet<NSString *> *allowedChannels;
-    if ([self.updaterDelegate respondsToSelector:@selector(allowedChannelsForUpdater:)]) {
-        allowedChannels = [self.updaterDelegate allowedChannelsForUpdater:self.updater];
+    id<SPUUpdaterDelegate> updaterDelegate = _updaterDelegate;
+    if (updater != nil && [updaterDelegate respondsToSelector:@selector(allowedChannelsForUpdater:)]) {
+        allowedChannels = [updaterDelegate allowedChannelsForUpdater:updater];
         if (allowedChannels == nil) {
             SULog(SULogLevelError, @"Error: -allowedChannelsForUpdater: cannot return nil. Treating this as an empty set.");
             allowedChannels = [NSSet set];
@@ -250,13 +290,13 @@
         allowedChannels = [NSSet set];
     }
     
-    SUAppcast *macOSAppcast = [[self class] filterAppcast:loadedAppcast forMacOSAndAllowedChannels:allowedChannels];
+    SUAppcast *macOSAppcast = [SUAppcastDriver filterAppcast:loadedAppcast forMacOSAndAllowedChannels:allowedChannels];
     
     id<SUVersionComparison> applicationVersionComparator = [self versionComparator];
     
-    NSNumber *phasedUpdateGroup = background ? @([SUPhasedUpdateGroupInfo updateGroupForHost:self.host]) : nil;
+    NSNumber *phasedUpdateGroup = background ? @([SUPhasedUpdateGroupInfo updateGroupForHost:_host]) : nil;
     
-    SPUSkippedUpdate *skippedUpdate = background ? [SPUSkippedUpdate skippedUpdateForHost:self.host] : nil;
+    SPUSkippedUpdate *skippedUpdate = background ? [SPUSkippedUpdate skippedUpdateForHost:_host] : nil;
     
     NSDate *currentDate = [NSDate date];
     
@@ -264,7 +304,7 @@
     // the minimum autoupdate version. We filter out updates that fail the minimum
     // autoupdate version test because we have a preference over minor updates that can be
     // downloaded and installed with less disturbance
-    SUAppcast *passesMinimumAutoupdateAppcast = [[self class] filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:self.host.version versionComparator:applicationVersionComparator testOSVersion:YES testMinimumAutoupdateVersion:YES];
+    SUAppcast *passesMinimumAutoupdateAppcast = [SUAppcastDriver filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:_host.version versionComparator:applicationVersionComparator testOSVersion:YES testMinimumAutoupdateVersion:YES];
     
     SUAppcastItem *secondaryItemPassesMinimumAutoupdate = nil;
     SUAppcastItem *primaryItemPassesMinimumAutoupdate = [self retrieveBestAppcastItemFromAppcast:passesMinimumAutoupdateAppcast versionComparator:applicationVersionComparator secondaryUpdate:&secondaryItemPassesMinimumAutoupdate];
@@ -274,7 +314,7 @@
     SUAppcastItem *finalPrimaryItem;
     SUAppcastItem *finalSecondaryItem = nil;
     if (![self isItemNewer:primaryItemPassesMinimumAutoupdate]) {
-        SUAppcast *failsMinimumAutoupdateAppcast = [[self class] filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:self.host.version versionComparator:applicationVersionComparator testOSVersion:YES testMinimumAutoupdateVersion:NO];
+        SUAppcast *failsMinimumAutoupdateAppcast = [SUAppcastDriver filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:_host.version versionComparator:applicationVersionComparator testOSVersion:YES testMinimumAutoupdateVersion:NO];
         
         finalPrimaryItem = [self retrieveBestAppcastItemFromAppcast:failsMinimumAutoupdateAppcast versionComparator:applicationVersionComparator secondaryUpdate:&finalSecondaryItem];
     } else {
@@ -284,28 +324,31 @@
     
     if ([self isItemNewer:finalPrimaryItem]) {
         // We found a suitable update
-        [self.delegate didFindValidUpdateWithAppcastItem:finalPrimaryItem secondaryAppcastItem:finalSecondaryItem];
+        [delegate didFindValidUpdateWithAppcastItem:finalPrimaryItem secondaryAppcastItem:finalSecondaryItem];
     } else {
         // Find the latest appcast item that we can report to the user and updater delegates
         // This may include updates that fail due to OS version requirements.
         // This excludes newer backgrounded updates that fail because they are skipped or not in current phased rollout group
-        SUAppcast *notFoundAppcast = [[self class] filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:self.host.version versionComparator:applicationVersionComparator testOSVersion:NO testMinimumAutoupdateVersion:NO];
+        SUAppcast *notFoundAppcast = [SUAppcastDriver filterSupportedAppcast:macOSAppcast phasedUpdateGroup:phasedUpdateGroup skippedUpdate:skippedUpdate currentDate:currentDate hostVersion:_host.version versionComparator:applicationVersionComparator testOSVersion:NO testMinimumAutoupdateVersion:NO];
         
         SUAppcastItem *notFoundPrimaryItem = [self retrieveBestAppcastItemFromAppcast:notFoundAppcast versionComparator:applicationVersionComparator secondaryUpdate:nil];
         
         NSComparisonResult hostToLatestAppcastItemComparisonResult;
         if (notFoundPrimaryItem != nil) {
-            hostToLatestAppcastItemComparisonResult = [applicationVersionComparator compareVersion:self.host.version toVersion:notFoundPrimaryItem.versionString];
+            hostToLatestAppcastItemComparisonResult = [applicationVersionComparator compareVersion:_host.version toVersion:notFoundPrimaryItem.versionString];
         } else {
             hostToLatestAppcastItemComparisonResult = 0;
         }
         
-        [self.delegate didNotFindUpdateWithLatestAppcastItem:notFoundPrimaryItem hostToLatestAppcastItemComparisonResult:hostToLatestAppcastItemComparisonResult background:background];
+        [delegate didNotFindUpdateWithLatestAppcastItem:notFoundPrimaryItem hostToLatestAppcastItemComparisonResult:hostToLatestAppcastItemComparisonResult background:background];
     }
 }
 
-// This method is used by unit tests
+// Note: This method is used by unit tests
 + (SUAppcast *)filterAppcast:(SUAppcast *)appcast forMacOSAndAllowedChannels:(NSSet<NSString *> *)allowedChannels
+#ifndef BUILDING_SPARKLE_TESTS
+SPU_OBJC_DIRECT
+#endif
 {
     return [appcast copyByFilteringItems:^(SUAppcastItem *item) {
         // We will never care about other OS's
@@ -330,8 +373,11 @@
     }];
 }
 
-// This method is used by unit tests
+// Note: This method is used by unit tests
 + (SUAppcast *)filterSupportedAppcast:(SUAppcast *)appcast phasedUpdateGroup:(NSNumber * _Nullable)phasedUpdateGroup skippedUpdate:(SPUSkippedUpdate * _Nullable)skippedUpdate currentDate:(NSDate *)currentDate hostVersion:(NSString *)hostVersion versionComparator:(id<SUVersionComparison>)versionComparator testOSVersion:(BOOL)testOSVersion testMinimumAutoupdateVersion:(BOOL)testMinimumAutoupdateVersion
+#ifndef BUILDING_SPARKLE_TESTS
+SPU_OBJC_DIRECT
+#endif
 {
     BOOL hostPassesSkippedMajorVersion = [SPUAppcastItemStateResolver isMinimumAutoupdateVersionOK:skippedUpdate.majorVersion hostVersion:hostVersion versionComparator:versionComparator];
     
@@ -365,9 +411,12 @@
     return item;
 }
 
-// This method is used by unit tests
+// Note: this method is used by unit tests
 // This method should not do *any* filtering, only version comparing
 + (SUAppcastItem *)bestItemFromAppcastItems:(NSArray *)appcastItems getDeltaItem:(SUAppcastItem * __autoreleasing *)deltaItem withHostVersion:(NSString *)hostVersion comparator:(id<SUVersionComparison>)comparator
+#ifndef BUILDING_SPARKLE_TESTS
+SPU_OBJC_DIRECT
+#endif
 {
     SUAppcastItem *item = [self bestItemFromAppcastItems:appcastItems comparator:comparator];
     if (item != nil && deltaItem != NULL) {
@@ -376,13 +425,14 @@
     return item;
 }
 
-- (id<SUVersionComparison>)versionComparator
+- (id<SUVersionComparison>)versionComparator SPU_OBJC_DIRECT
 {
     id<SUVersionComparison> comparator = nil;
     
     // Give the delegate a chance to provide a custom version comparator
-    if ([self.updaterDelegate respondsToSelector:@selector((versionComparatorForUpdater:))]) {
-        comparator = [self.updaterDelegate versionComparatorForUpdater:self.updater];
+    id<SPUUpdaterDelegate> updaterDelegate = _updaterDelegate;
+    if ([updaterDelegate respondsToSelector:@selector((versionComparatorForUpdater:))]) {
+        comparator = [updaterDelegate versionComparatorForUpdater:_updater];
     }
     
     // If we don't get a comparator from the delegate, use the default comparator
@@ -393,12 +443,12 @@
     return comparator;
 }
 
-- (BOOL)isItemNewer:(SUAppcastItem *)ui
+- (BOOL)isItemNewer:(SUAppcastItem *)ui SPU_OBJC_DIRECT
 {
-    return ui != nil && [[self versionComparator] compareVersion:self.host.version toVersion:ui.versionString] == NSOrderedAscending;
+    return ui != nil && [[self versionComparator] compareVersion:_host.version toVersion:ui.versionString] == NSOrderedAscending;
 }
 
-+ (BOOL)item:(SUAppcastItem *)ui containsSkippedUpdate:(SPUSkippedUpdate * _Nullable)skippedUpdate hostPassesSkippedMajorVersion:(BOOL)hostPassesSkippedMajorVersion versionComparator:(id<SUVersionComparison>)versionComparator
++ (BOOL)item:(SUAppcastItem *)ui containsSkippedUpdate:(SPUSkippedUpdate * _Nullable)skippedUpdate hostPassesSkippedMajorVersion:(BOOL)hostPassesSkippedMajorVersion versionComparator:(id<SUVersionComparison>)versionComparator SPU_OBJC_DIRECT
 {
     NSString *skippedMajorVersion = skippedUpdate.majorVersion;
     NSString *skippedMajorSubreleaseVersion = skippedUpdate.majorSubreleaseVersion;
@@ -421,7 +471,7 @@
     return NO;
 }
 
-+ (BOOL)itemIsReadyForPhasedRollout:(SUAppcastItem *)ui phasedUpdateGroup:(NSNumber * _Nullable)phasedUpdateGroup currentDate:(NSDate *)currentDate hostVersion:(NSString *)hostVersion versionComparator:(id<SUVersionComparison>)versionComparator
++ (BOOL)itemIsReadyForPhasedRollout:(SUAppcastItem *)ui phasedUpdateGroup:(NSNumber * _Nullable)phasedUpdateGroup currentDate:(NSDate *)currentDate hostVersion:(NSString *)hostVersion versionComparator:(id<SUVersionComparison>)versionComparator SPU_OBJC_DIRECT
 {
     if (phasedUpdateGroup == nil || ui.criticalUpdate) {
         return YES;
@@ -451,10 +501,10 @@
 
 - (void)cleanup:(void (^)(void))completionHandler
 {
-    if (self.downloadDriver == nil) {
+    if (_downloadDriver == nil) {
         completionHandler();
     } else {
-        [self.downloadDriver cleanup:completionHandler];
+        [_downloadDriver cleanup:completionHandler];
     }
 }
 
