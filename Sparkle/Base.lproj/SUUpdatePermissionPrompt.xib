@@ -271,7 +271,7 @@ Gw
             <point key="canvasLocation" x="-291" y="554"/>
         </customView>
         <customView id="ov1-yV-Uol" userLabel="Anonymous Info View">
-            <rect key="frame" x="0.0" y="-2" width="437" height="27"/>
+            <rect key="frame" x="0.0" y="0.0" width="437" height="27"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <customView translatesAutoresizingMaskIntoConstraints="NO" id="a0k-dW-Jhx" userLabel="View">
@@ -343,7 +343,7 @@ Gw
                     <rect key="frame" x="0.0" y="-26" width="437" height="64"/>
                     <subviews>
                         <button focusRingType="none" translatesAutoresizingMaskIntoConstraints="NO" id="BId-kb-eYW" userLabel="automaticallyDownloadUpdatesButton">
-                            <rect key="frame" x="104" y="25" width="248" height="16"/>
+                            <rect key="frame" x="105" y="25" width="248" height="16"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="14" id="kJy-g7-0Un"/>
                             </constraints>
@@ -357,7 +357,7 @@ Gw
                         </button>
                     </subviews>
                     <constraints>
-                        <constraint firstItem="BId-kb-eYW" firstAttribute="leading" secondItem="MEW-2n-kJE" secondAttribute="leading" constant="105" id="MnW-AM-QzP"/>
+                        <constraint firstItem="BId-kb-eYW" firstAttribute="leading" secondItem="MEW-2n-kJE" secondAttribute="leading" constant="106" id="MnW-AM-QzP"/>
                         <constraint firstAttribute="bottom" secondItem="BId-kb-eYW" secondAttribute="bottom" constant="26" id="QXK-90-kUJ"/>
                         <constraint firstAttribute="trailing" relation="greaterThanOrEqual" secondItem="BId-kb-eYW" secondAttribute="trailing" constant="20" id="Vk3-CH-cXd"/>
                         <constraint firstItem="BId-kb-eYW" firstAttribute="top" secondItem="MEW-2n-kJE" secondAttribute="top" constant="24" id="YrX-aL-LAq"/>
