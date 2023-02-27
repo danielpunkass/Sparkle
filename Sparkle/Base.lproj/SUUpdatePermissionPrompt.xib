@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="18122" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="21507" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="18122"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="21507"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
@@ -27,17 +27,14 @@
             <windowStyleMask key="styleMask" titled="YES"/>
             <windowCollectionBehavior key="collectionBehavior" fullScreenAuxiliary="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="83" y="492" width="488" height="379"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="1440" height="875"/>
+            <rect key="contentRect" x="83" y="492" width="436" height="379"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="2304" height="1271"/>
             <view key="contentView" id="6">
-                <rect key="frame" x="0.0" y="0.0" width="437" height="379"/>
+                <rect key="frame" x="0.0" y="0.0" width="436" height="379"/>
                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
                     <stackView distribution="fill" orientation="vertical" alignment="leading" spacing="0.0" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="qNw-uD-4Bg">
-                        <rect key="frame" x="0.0" y="0.0" width="437" height="379"/>
-                        <constraints>
-                            <constraint firstAttribute="width" constant="437" id="gcK-Q4-n9c"/>
-                        </constraints>
+                        <rect key="frame" x="0.0" y="0.0" width="436" height="379"/>
                     </stackView>
                 </subviews>
                 <constraints>
@@ -122,32 +119,31 @@
             <point key="canvasLocation" x="-241" y="-37"/>
         </view>
         <customView hidden="YES" id="39" userLabel="MoreInfoView">
-            <rect key="frame" x="0.0" y="0.0" width="437" height="205"/>
+            <rect key="frame" x="0.0" y="0.0" width="434" height="191"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" translatesAutoresizingMaskIntoConstraints="NO" id="46" userLabel="SystemProfileInfo">
-                    <rect key="frame" x="107" y="123" width="312" height="70"/>
+                    <rect key="frame" x="104" y="123" width="312" height="56"/>
                     <constraints>
-                        <constraint firstAttribute="height" relation="greaterThanOrEqual" constant="70" id="Csk-S6-dh4"/>
                         <constraint firstAttribute="width" constant="308" id="iAG-SY-yVp"/>
                     </constraints>
                     <textFieldCell key="cell" sendsActionOnEndEditing="YES" id="183">
                         <font key="font" metaFont="smallSystem"/>
-                        <string key="title">Anonymous system profile information is used to help us plan future development work. Please contact us if you have any questions about this.
+                        <string key="title">Anonymous system profile information is used to help us plan future development work.
 
-This is the information that would be sent:</string>
+When included, this is the information that will be sent:</string>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <scrollView autohidesScrollers="YES" horizontalLineScroll="16" horizontalPageScroll="0.0" verticalLineScroll="16" verticalPageScroll="0.0" hasHorizontalScroller="NO" usesPredominantAxisScrolling="NO" translatesAutoresizingMaskIntoConstraints="NO" id="40" userLabel="ScrollView">
-                    <rect key="frame" x="109" y="0.0" width="308" height="115"/>
+                    <rect key="frame" x="105" y="0.0" width="312" height="115"/>
                     <clipView key="contentView" id="sbp-rk-wxX">
-                        <rect key="frame" x="1" y="1" width="306" height="113"/>
+                        <rect key="frame" x="1" y="1" width="310" height="113"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <tableView focusRingType="none" verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" alternatingRowBackgroundColors="YES" multipleSelection="NO" autosaveColumns="NO" typeSelect="NO" rowHeight="14" id="41">
-                                <rect key="frame" x="0.0" y="0.0" width="306" height="113"/>
+                                <rect key="frame" x="0.0" y="0.0" width="310" height="113"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="2"/>
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -205,15 +201,14 @@ This is the information that would be sent:</string>
             </subviews>
             <constraints>
                 <constraint firstItem="46" firstAttribute="top" secondItem="39" secondAttribute="top" constant="12" id="0rj-EA-SIj"/>
-                <constraint firstItem="40" firstAttribute="trailing" secondItem="46" secondAttribute="trailing" id="5Ze-wu-AsK"/>
-                <constraint firstItem="40" firstAttribute="width" secondItem="46" secondAttribute="width" id="AfJ-OK-Apa"/>
-                <constraint firstItem="40" firstAttribute="leading" secondItem="46" secondAttribute="leading" id="Qg9-kp-Lzl"/>
-                <constraint firstItem="46" firstAttribute="leading" secondItem="39" secondAttribute="leading" constant="109" id="TMg-61-Tbj"/>
-                <constraint firstAttribute="trailing" secondItem="46" secondAttribute="trailing" constant="20" id="fYg-If-EVL"/>
+                <constraint firstItem="40" firstAttribute="trailing" secondItem="46" secondAttribute="trailing" constant="3" id="5Ze-wu-AsK"/>
+                <constraint firstItem="40" firstAttribute="leading" secondItem="46" secondAttribute="leading" constant="-1" id="Qg9-kp-Lzl"/>
+                <constraint firstItem="46" firstAttribute="leading" secondItem="39" secondAttribute="leading" constant="106" id="TMg-61-Tbj"/>
+                <constraint firstAttribute="trailing" secondItem="46" secondAttribute="trailing" constant="20" symbolic="YES" id="fYg-If-EVL"/>
                 <constraint firstAttribute="bottom" secondItem="40" secondAttribute="bottom" id="o4Y-3j-NmQ"/>
                 <constraint firstItem="40" firstAttribute="top" secondItem="46" secondAttribute="bottom" constant="8" symbolic="YES" id="seb-Gl-jtw"/>
             </constraints>
-            <point key="canvasLocation" x="-621" y="194"/>
+            <point key="canvasLocation" x="-338" y="254"/>
         </customView>
         <customView id="0CP-x7-YFK" userLabel="Response View">
             <rect key="frame" x="0.0" y="0.0" width="437" height="55"/>
@@ -282,7 +277,7 @@ Gw
                     <rect key="frame" x="0.0" y="-26" width="437" height="66"/>
                     <subviews>
                         <button focusRingType="none" translatesAutoresizingMaskIntoConstraints="NO" id="a90-Iq-FgS" userLabel="IncludeInfoButton">
-                            <rect key="frame" x="104" y="25" width="313" height="16"/>
+                            <rect key="frame" x="105" y="25" width="312" height="16"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="14" id="MvK-K5-kxt"/>
                                 <constraint firstAttribute="height" relation="greaterThanOrEqual" constant="14" id="STF-87-eYy"/>
@@ -301,7 +296,7 @@ Gw
                             </connections>
                         </button>
                         <button focusRingType="none" horizontalHuggingPriority="750" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="JW6-0z-Ud3">
-                            <rect key="frame" x="85" y="25" width="16" height="16"/>
+                            <rect key="frame" x="86" y="25" width="16" height="16"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="16" id="HMA-GI-C0a"/>
                                 <constraint firstAttribute="width" constant="16" id="Qxo-Ga-nVP"/>
@@ -322,7 +317,7 @@ Gw
                     </subviews>
                     <constraints>
                         <constraint firstItem="a90-Iq-FgS" firstAttribute="centerY" secondItem="JW6-0z-Ud3" secondAttribute="centerY" id="BNJ-xV-faQ"/>
-                        <constraint firstItem="a90-Iq-FgS" firstAttribute="leading" secondItem="a0k-dW-Jhx" secondAttribute="leading" constant="105" id="ILg-Qu-R6M"/>
+                        <constraint firstItem="a90-Iq-FgS" firstAttribute="leading" secondItem="a0k-dW-Jhx" secondAttribute="leading" constant="106" id="ILg-Qu-R6M"/>
                         <constraint firstItem="a90-Iq-FgS" firstAttribute="top" secondItem="a0k-dW-Jhx" secondAttribute="top" constant="26" id="Mh6-5L-xqM"/>
                         <constraint firstAttribute="trailing" secondItem="a90-Iq-FgS" secondAttribute="trailing" constant="20" id="U4G-Eh-HPu"/>
                         <constraint firstItem="JW6-0z-Ud3" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="a0k-dW-Jhx" secondAttribute="leading" constant="20" symbolic="YES" id="V3P-iz-aJ9"/>
@@ -338,7 +333,7 @@ Gw
                 <constraint firstAttribute="trailing" secondItem="a0k-dW-Jhx" secondAttribute="trailing" id="rAn-bJ-Mp6"/>
                 <constraint firstAttribute="bottom" secondItem="a0k-dW-Jhx" secondAttribute="bottom" constant="-26" id="xw5-bj-VOd"/>
             </constraints>
-            <point key="canvasLocation" x="-113" y="145.5"/>
+            <point key="canvasLocation" x="-319" y="79"/>
         </customView>
         <customView hidden="YES" translatesAutoresizingMaskIntoConstraints="NO" id="AGr-V0-0al" userLabel="Placeholder View">
             <rect key="frame" x="0.0" y="0.0" width="437" height="205"/>
