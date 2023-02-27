@@ -2936,6 +2936,9 @@
 					895C5DC024D78E210058A82D = {
 						CreatedOnToolsVersion = 12.0;
 					};
+					8DC2EF4F0486A6940098B216 = {
+						LastSwiftMigration = 1420;
+					};
 					EA1E280E22B64522004AA304 = {
 						CreatedOnToolsVersion = 10.2.1;
 					};
