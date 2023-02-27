@@ -85,6 +85,7 @@
 		61299A6009CA6EB100B7442F /* SUConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 61299A5F09CA6EB100B7442F /* SUConstants.m */; };
 		61299B3609CB04E000B7442F /* Sparkle.h in Headers */ = {isa = PBXBuildFile; fileRef = 61299B3509CB04E000B7442F /* Sparkle.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		612DCBB00D488BC60015DBEA /* SUUpdatePermissionPrompt.m in Sources */ = {isa = PBXBuildFile; fileRef = 612DCBAE0D488BC60015DBEA /* SUUpdatePermissionPrompt.m */; };
+		615AE3D00D64DC40001CA7BD /* SUModelTranslation.plist in Resources */ = {isa = PBXBuildFile; fileRef = 615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */; };
 		6196CFF909C72148000DC222 /* SUStatusController.h in Headers */ = {isa = PBXBuildFile; fileRef = 6196CFE309C71ADE000DC222 /* SUStatusController.h */; settings = {ATTRIBUTES = (); }; };
 		6196CFFA09C72149000DC222 /* SUStatusController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6196CFE409C71ADE000DC222 /* SUStatusController.m */; };
 		61A2259E0D1C495D00430CCD /* SUVersionComparisonProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 61A2259C0D1C495D00430CCD /* SUVersionComparisonProtocol.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -653,55 +654,6 @@
 			remoteGlobalIDString = 72B398D11D3D879300EE297F;
 			remoteInfo = Autoupdate;
 		};
-		72CCCC14287B3D1900E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 8DC2EF4F0486A6940098B216;
-			remoteInfo = Sparkle;
-		};
-		72CCCC16287B3D3400E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E280E22B64522004AA304;
-			remoteInfo = bsdiff;
-		};
-		72CCCC18287B3D3D00E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E282C22B660BE004AA304;
-			remoteInfo = ed25519;
-		};
-		72CCCC1A287B3D9000E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E282C22B660BE004AA304;
-			remoteInfo = ed25519;
-		};
-		72CCCC1C287B3D9600E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E282C22B660BE004AA304;
-			remoteInfo = ed25519;
-		};
-		72CCCC1E287B3DA100E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E282C22B660BE004AA304;
-			remoteInfo = ed25519;
-		};
-		72CCCC20287B3DA400E7156B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EA1E280E22B64522004AA304;
-			remoteInfo = bsdiff;
-		};
 		72D954B91CBB6E27006F28BD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
@@ -964,6 +916,7 @@
 		612DCBAE0D488BC60015DBEA /* SUUpdatePermissionPrompt.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SUUpdatePermissionPrompt.m; sourceTree = "<group>"; };
 		613151B20FB4946A000DCD59 /* is */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = is; path = is.lproj/Sparkle.strings; sourceTree = "<group>"; };
 		615409C4103BBC4000125AF1 /* cs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = cs; path = cs.lproj/Sparkle.strings; sourceTree = "<group>"; };
+		615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = SUModelTranslation.plist; sourceTree = "<group>"; };
 		6186554310D7484E00B1E074 /* pt-PT */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = "pt-PT"; path = "pt-PT.lproj/Sparkle.strings"; sourceTree = "<group>"; };
 		618915730E35937600B5E981 /* sv */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Sparkle.strings; sourceTree = "<group>"; };
 		6195D4920E404AD700D41A50 /* ru */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Sparkle.strings; sourceTree = "<group>"; };
@@ -1764,6 +1717,7 @@
 				1420DF4F196247F900203BB0 /* Images.xcassets */,
 				14732BBC1960EFB500593899 /* README.markdown */,
 				14732BB91960EEEE00593899 /* SampleAppcast.xml */,
+				615AE3CF0D64DC40001CA7BD /* SUModelTranslation.plist */,
 				1EAA4C8A2132C7BF00604473 /* ReleaseNotesColorStyle.css */,
 			);
 			path = Resources;
@@ -2621,8 +2575,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				72CCCC19287B3D3D00E7156B /* PBXTargetDependency */,
-				72CCCC17287B3D3400E7156B /* PBXTargetDependency */,
 				61B5F91C09C4CF7200B25A18 /* PBXTargetDependency */,
 				726E4A201C86C88F00C57C6A /* PBXTargetDependency */,
 			);
@@ -2642,8 +2594,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				72CCCC21287B3DA400E7156B /* PBXTargetDependency */,
-				72CCCC1F287B3DA100E7156B /* PBXTargetDependency */,
 			);
 			name = generate_appcast;
 			packageProductDependencies = (
@@ -2766,7 +2716,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				72CCCC15287B3D1900E7156B /* PBXTargetDependency */,
 			);
 			name = TestAppHelper;
 			productName = TestAppHelper;
@@ -2885,7 +2834,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				72CCCC1B287B3D9000E7156B /* PBXTargetDependency */,
 			);
 			name = generate_keys;
 			packageProductDependencies = (
@@ -2906,7 +2854,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				72CCCC1D287B3D9600E7156B /* PBXTargetDependency */,
 			);
 			name = sign_update;
 			packageProductDependencies = (
@@ -2924,7 +2871,7 @@
 			attributes = {
 				CLASSPREFIX = SU;
 				LastSwiftUpdateCheck = 1020;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 1410;
 				ORGANIZATIONNAME = "Sparkle Project";
 				TargetAttributes = {
 					5D06E8CF0FD68C7C005AE3F6 = {
@@ -2988,6 +2935,9 @@
 					};
 					895C5DC024D78E210058A82D = {
 						CreatedOnToolsVersion = 12.0;
+					};
+					8DC2EF4F0486A6940098B216 = {
+						LastSwiftMigration = 1420;
 					};
 					EA1E280E22B64522004AA304 = {
 						CreatedOnToolsVersion = 10.2.1;
@@ -3187,6 +3137,7 @@
 				61AAE8280A321A7F00D8810D /* Sparkle.strings in Resources */,
 				1EAA4C8B2132C7BF00604473 /* ReleaseNotesColorStyle.css in Resources */,
 				723ABD38259A9BA500BDB4FA /* SUUpdateAlert.xib in Resources */,
+				615AE3D00D64DC40001CA7BD /* SUModelTranslation.plist in Resources */,
 				55C14BEF136EF21700649790 /* SUStatus.xib in Resources */,
 				723ABD6C259A9CBC00BDB4FA /* SUUpdatePermissionPrompt.xib in Resources */,
 			);
@@ -3784,41 +3735,6 @@
 			isa = PBXTargetDependency;
 			target = 72B398D11D3D879300EE297F /* Autoupdate */;
 			targetProxy = 72A5D5AB1D6929260009E5AC /* PBXContainerItemProxy */;
-		};
-		72CCCC15287B3D1900E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 8DC2EF4F0486A6940098B216 /* Sparkle */;
-			targetProxy = 72CCCC14287B3D1900E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC17287B3D3400E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E280E22B64522004AA304 /* bsdiff */;
-			targetProxy = 72CCCC16287B3D3400E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC19287B3D3D00E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E282C22B660BE004AA304 /* ed25519 */;
-			targetProxy = 72CCCC18287B3D3D00E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC1B287B3D9000E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E282C22B660BE004AA304 /* ed25519 */;
-			targetProxy = 72CCCC1A287B3D9000E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC1D287B3D9600E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E282C22B660BE004AA304 /* ed25519 */;
-			targetProxy = 72CCCC1C287B3D9600E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC1F287B3DA100E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E282C22B660BE004AA304 /* ed25519 */;
-			targetProxy = 72CCCC1E287B3DA100E7156B /* PBXContainerItemProxy */;
-		};
-		72CCCC21287B3DA400E7156B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = EA1E280E22B64522004AA304 /* bsdiff */;
-			targetProxy = 72CCCC20287B3DA400E7156B /* PBXContainerItemProxy */;
 		};
 		72D954BA1CBB6E27006F28BD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

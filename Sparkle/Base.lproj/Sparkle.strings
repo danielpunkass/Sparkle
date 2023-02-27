@@ -116,7 +116,7 @@
 "Ready to Install" = "Ready to Install";
 
 /* No comment provided by engineer. */
-"Should %1$@ automatically check for updates? You can always check for updates manually from the %1$@ menu." = "Should %1$@ automatically check for updates? You can always check for updates manually from the %1$@ menu.";
+"Should %1$@ automatically check for updates? You can always check for updates manually from the %1$@ menu." = "When enabled, %1$@ will periodically check for software updates. You can also check for updates manually from the %1$@ menu.";
 
 /* No comment provided by engineer. */
 "The update checker failed to start correctly. You should contact the app developer to report this issue and verify that you have the latest version." = "The update checker failed to start correctly. You should contact the app developer to report this issue and verify that you have the latest version.";
