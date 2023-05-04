@@ -135,7 +135,6 @@ NS_ASSUME_NONNULL_BEGIN
     return [self objectForInfoDictionaryKey:SUPublicEDKeyKey];
 }
 
-#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
 - (NSString *_Nullable)publicDSAKey SPU_OBJC_DIRECT
 {
     // Maybe the key is just a string in the Info.plist.
@@ -161,23 +160,17 @@ NS_ASSUME_NONNULL_BEGIN
     }
     return key;
 }
-#endif
 
 - (SUPublicKeys *)publicKeys
 {
     return [[SUPublicKeys alloc] initWithEd:[self publicEDKey]
-#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
-                                        dsa:[self publicDSAKey]
-#endif
-    ];
+                                        dsa:[self publicDSAKey]];
 }
 
-#if SPARKLE_BUILD_LEGACY_DSA_SUPPORT
 - (NSString * _Nullable)publicDSAKeyFileKey
 {
     return [self objectForInfoDictionaryKey:SUPublicDSAKeyFileKey];
 }
-#endif
 
 // WKWebView has a bug where it won't work in loading local HTML content in sandboxed apps that do not have an outgoing network entitlement
 // FB6993802: https://twitter.com/sindresorhus/status/1160577243929878528 | https://github.com/feedback-assistant/reports/issues/1
