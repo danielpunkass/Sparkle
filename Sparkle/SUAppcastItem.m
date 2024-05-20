@@ -49,7 +49,7 @@ static NSString *SUAppcastItemDeltaFromSparkleLocalesKey = @"SUAppcastItemDeltaF
 
 @implementation SUAppcastItem
 {
-    // Auxillary appcast item state that needs to be evaluated based on the host state
+    // Auxiliary appcast item state that needs to be evaluated based on the host state
     // This may be nil if the client creates an SUAppcastItem with a deprecated initializer
     // In that case we will need to fallback to safe behavior
     SPUAppcastItemState *_state;
@@ -96,7 +96,7 @@ static NSString *SUAppcastItemDeltaFromSparkleLocalesKey = @"SUAppcastItemDeltaF
     self = [super init];
     
     if (self != nil) {
-        _deltaUpdates = [decoder decodeObjectOfClasses:[NSSet setWithArray:@[[NSDictionary class], [SUAppcastItem class]]] forKey:SUAppcastItemDeltaUpdatesKey];
+        _deltaUpdates = [decoder decodeObjectOfClasses:[NSSet setWithArray:@[[NSDictionary class], [SUAppcastItem class], [NSString class]]] forKey:SUAppcastItemDeltaUpdatesKey];
         _deltaFromSparkleExecutableSize = [decoder decodeObjectOfClass:[NSNumber class] forKey:SUAppcastItemDeltaFromSparkleExecutableSizeKey];
         _deltaFromSparkleLocales = [decoder decodeObjectOfClasses:[NSSet setWithArray:@[[NSSet class], [NSString class]]] forKey:SUAppcastItemDeltaFromSparkleLocalesKey];
         

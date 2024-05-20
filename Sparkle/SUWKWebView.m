@@ -28,6 +28,7 @@
 {
     WKWebView *_webView;
     WKNavigation *_currentNavigation;
+    NSArray<NSString *> *_customAllowedURLSchemes;
     
     void (^_completionHandler)(NSError * _Nullable);
     
@@ -52,7 +53,27 @@ static WKUserScript *_userScriptWithInjectedStyleSource(NSString *styleSource)
     return [[WKUserScript alloc] initWithSource:scriptSource injectionTime:WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:YES];
 }
 
-- (instancetype)initWithColorStyleSheetLocation:(NSURL *)colorStyleSheetLocation fontFamily:(NSString *)fontFamily fontPointSize:(int)fontPointSize javaScriptEnabled:(BOOL)javaScriptEnabled
+static WKUserScript *_userScriptForExposingCurrentRelease(NSString *releaseString)
+{
+    // Check that release string can be safely injected
+    NSMutableCharacterSet *allowedCharacterSet = [NSMutableCharacterSet alphanumericCharacterSet];
+    [allowedCharacterSet addCharactersInString:@"_.- "];
+    if ([releaseString rangeOfCharacterFromSet:allowedCharacterSet.invertedSet].location != NSNotFound) {
+        SULog(SULogLevelDefault, @"warning: App version '%@' has characters unsafe for injection. The version number will not be exposed to the release notes CSS. Only [a-zA-Z0-9._- ] is allowed.", releaseString);
+        return nil;
+    }
+    
+    // This script adds the `sparkle-installed-version` class to all elements which have a matching `data-sparkle-version` attribute
+    NSString *scriptSource = [NSString stringWithFormat:
+        @"document.querySelectorAll(\'[data-sparkle-version=\"%@\"]\')\n"
+        @".forEach(installedVersionElement =>\n"
+        @"installedVersionElement.classList.add('sparkle-installed-version')\n"
+        @");", releaseString];
+    
+    return [[WKUserScript alloc] initWithSource:scriptSource injectionTime:WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:YES];
+}
+
+- (instancetype)initWithColorStyleSheetLocation:(NSURL *)colorStyleSheetLocation fontFamily:(NSString *)fontFamily fontPointSize:(int)fontPointSize javaScriptEnabled:(BOOL)javaScriptEnabled customAllowedURLSchemes:(NSArray<NSString *> *)customAllowedURLSchemes installedVersion:(NSString *)installedVersion
 {
     self = [super init];
     if (self != nil) {
@@ -91,11 +112,26 @@ static WKUserScript *_userScriptWithInjectedStyleSource(NSString *styleSource)
         // In fact, we must execute javascript to properly inject our default CSS style into the DOM
         // Legacy WebView has exposed methods for custom stylesheets and default fonts,
         // but WKWebView seems to forgo that type of API surface in favor of user scripts like this
-        [userContentController addUserScript:_userScriptWithInjectedStyleSource(finalStyleContents)];
+        WKUserScript *userScriptWithInjectedStyleSource = _userScriptWithInjectedStyleSource(finalStyleContents);
+        if (userScriptWithInjectedStyleSource == nil) {
+            SULog(SULogLevelError, @"Failed to create script for injecting style");
+        } else {
+            [userContentController addUserScript:userScriptWithInjectedStyleSource];
+        }
+        
+        WKUserScript *userScriptForExposingCurrentRelease = _userScriptForExposingCurrentRelease(installedVersion);
+        if (userScriptForExposingCurrentRelease == nil) {
+            SULog(SULogLevelDefault, @"warning: Failed to create script for injecting version %@", installedVersion);
+        } else {
+            [userContentController addUserScript:userScriptForExposingCurrentRelease];
+        }
+        
         configuration.userContentController = userContentController;
         
         _webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
         _webView.navigationDelegate = self;
+        
+        _customAllowedURLSchemes = customAllowedURLSchemes;
     }
     return self;
 }
@@ -179,7 +215,7 @@ static WKUserScript *_userScriptWithInjectedStyleSource(NSString *styleSource)
     NSURLRequest *request = navigationAction.request;
     NSURL *requestURL = request.URL;
     BOOL isAboutBlank = NO;
-    BOOL safeURL = SUReleaseNotesIsSafeURL(requestURL, &isAboutBlank);
+    BOOL safeURL = SUReleaseNotesIsSafeURL(requestURL, _customAllowedURLSchemes, &isAboutBlank);
     
     // Do not allow redirects to dangerous protocols such as file://
     if (!safeURL) {

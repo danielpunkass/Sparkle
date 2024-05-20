@@ -14,36 +14,40 @@
 
 static NSString *SURelaunchPathKey = @"SURelaunchPath";
 static NSString *SUHostBundlePathKey = @"SUHostBundlePath";
-static NSString *SUUpdateDirectoryPathKey = @"SUUpdateDirectoryPath";
-static NSString *SUDownloadNameKey = @"SUDownloadName";
+static NSString *SUUpdateURLBookmarkDataKey = @"SUUpdateURLBookmarkData";
 static NSString *SUSignaturesKey = @"SUSignatures";
 static NSString *SUDecryptionPasswordKey = @"SUDecryptionPassword";
 static NSString *SUInstallationTypeKey = @"SUInstallationType";
+static NSString *SUExpectedVersionKey = @"SUExpectedVersion";
+static NSString *SUExpectedContentLength = @"SUExpectedContentLength";
 
 @implementation SPUInstallationInputData
 
 @synthesize relaunchPath = _relaunchPath;
 @synthesize hostBundlePath = _hostBundlePath;
-@synthesize updateDirectoryPath = _updateDirectoryPath;
-@synthesize downloadName = _downloadName;
+@synthesize updateURLBookmarkData = _updateURLBookmarkData;
 @synthesize signatures = _signatures;
 @synthesize decryptionPassword = _decryptionPassword;
 @synthesize installationType = _installationType;
+@synthesize expectedVersion = _expectedVersion;
+@synthesize expectedContentLength = _expectedContentLength;
 
-- (instancetype)initWithRelaunchPath:(NSString *)relaunchPath hostBundlePath:(NSString *)hostBundlePath updateDirectoryPath:(NSString *)updateDirectoryPath downloadName:(NSString *)downloadName installationType:(NSString *)installationType signatures:(SUSignatures * _Nullable)signatures decryptionPassword:(nullable NSString *)decryptionPassword
+- (instancetype)initWithRelaunchPath:(NSString *)relaunchPath hostBundlePath:(NSString *)hostBundlePath updateURLBookmarkData:(NSData *)updateURLBookmarkData installationType:(NSString *)installationType signatures:(SUSignatures * _Nullable)signatures decryptionPassword:(nullable NSString *)decryptionPassword expectedVersion:(nonnull NSString *)expectedVersion expectedContentLength:(uint64_t)expectedContentLength
 {
     self = [super init];
     if (self != nil) {
         _relaunchPath = [relaunchPath copy];
         _hostBundlePath = [hostBundlePath copy];
-        _updateDirectoryPath = [updateDirectoryPath copy];
-        _downloadName = [downloadName copy];
+        _updateURLBookmarkData = updateURLBookmarkData;
         
         _installationType = [installationType copy];
         assert(SPUValidInstallationType(_installationType));
         
         _signatures = signatures;
         _decryptionPassword = [decryptionPassword copy];
+        
+        _expectedVersion = [expectedVersion copy];
+        _expectedContentLength = expectedContentLength;
     }
     return self;
 }
@@ -60,13 +64,8 @@ static NSString *SUInstallationTypeKey = @"SUInstallationType";
         return nil;
     }
     
-    NSString *updateDirectoryPath = [decoder decodeObjectOfClass:[NSString class] forKey:SUUpdateDirectoryPathKey];
-    if (updateDirectoryPath == nil) {
-        return nil;
-    }
-    
-    NSString *downloadName = [decoder decodeObjectOfClass:[NSString class] forKey:SUDownloadNameKey];
-    if (downloadName == nil) {
+    NSData *updateURLBookmarkData = [decoder decodeObjectOfClass:[NSData class] forKey:SUUpdateURLBookmarkDataKey];
+    if (updateURLBookmarkData == nil) {
         return nil;
     }
     
@@ -82,20 +81,26 @@ static NSString *SUInstallationTypeKey = @"SUInstallationType";
     
     NSString *decryptionPassword = [decoder decodeObjectOfClass:[NSString class] forKey:SUDecryptionPasswordKey];
     
-    return [self initWithRelaunchPath:relaunchPath hostBundlePath:hostBundlePath updateDirectoryPath:updateDirectoryPath downloadName:downloadName installationType:installationType signatures:signatures decryptionPassword:decryptionPassword];
+    NSString *expectedVersion = [decoder decodeObjectOfClass:[NSString class] forKey:SUExpectedVersionKey];
+    uint64_t expectedContentLength = (uint64_t)[decoder decodeInt64ForKey:SUExpectedContentLength];
+    
+    return [self initWithRelaunchPath:relaunchPath hostBundlePath:hostBundlePath updateURLBookmarkData:updateURLBookmarkData installationType:installationType signatures:signatures decryptionPassword:decryptionPassword expectedVersion:expectedVersion expectedContentLength:expectedContentLength];
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder
 {
     [coder encodeObject:_relaunchPath forKey:SURelaunchPathKey];
     [coder encodeObject:_hostBundlePath forKey:SUHostBundlePathKey];
-    [coder encodeObject:_updateDirectoryPath forKey:SUUpdateDirectoryPathKey];
+    [coder encodeObject:_updateURLBookmarkData forKey:SUUpdateURLBookmarkDataKey];
     [coder encodeObject:_installationType forKey:SUInstallationTypeKey];
-    [coder encodeObject:_downloadName forKey:SUDownloadNameKey];
     [coder encodeObject:_signatures forKey:SUSignaturesKey];
     if (_decryptionPassword != nil) {
         [coder encodeObject:_decryptionPassword forKey:SUDecryptionPasswordKey];
     }
+    if (_expectedVersion != nil) {
+        [coder encodeObject:_expectedVersion forKey:SUExpectedVersionKey];
+    }
+    [coder encodeInt64:(int64_t)_expectedContentLength forKey:SUExpectedContentLength];
 }
 
 + (BOOL)supportsSecureCoding

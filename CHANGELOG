@@ -1,17 +1,88 @@
+# 2.6.2
+
+* Create and use temp extraction directory in generate_appcast again (#2555) (Zorg)
+
+# 2.6.1
+
+* Extract archives in a separate directory from the input archive (#2550) (Zorg)
+* Fix the release notes WebKit view not updating background when transitioning from light to dark mode (#2542) (Zorg)
+* Add NN (Norwegian Nynorsk) locale (#2532) (Sjur N Moshagen, Zorg)
+* Create tar.xz files with built-in tar and remove bzip2 fallback for creating a release distribution (#2535) (Zorg)
+* Add fallback in case SULocalizedStringFromTableInBundle() fails (#2533) (Zorg)
+* Remove assert on download response being available fixing rare crash (#2547) (Zorg)
+* Clarify when authoriation prompt may show in SPUUserDriver documentation (#2531, #2534) (Zorg)
+* Fix typos in codebase (#2537) (Viktor Szépe)
+
+# 2.6.0
+
+* Perform Gatekeeper scan to pre-warm app launch (#2505) (Zorg)
+* Disable sandboxing for the Downloader XPC service by default to fix downloader prompt warnings (#2511) (Zorg)
+* Store private seed as the secret for newly generated keys (#2472) (Zorg)
+* Improve signing error message to developers if they serve the wrong update file (#2471) (Zorg)
+* Prevent app modification warnings from external updaters (like sparkli-cli) by improving installation (#2516) (Zorg)
+* Update Korean localization (#2504) (CheolHyun Mun)
+* Use $PROJECT_DIR instead of $SRCROOT (#2489) (Zorg)
+* Set Package.swift minimum deployment to macOS 10.13 (#2481) (Eitot)
+* Fix false positive analyzer warning about resumableUpdate type (#2454) (Zorg)
+
+# 2.5.2
+
+* Don't clean up update directory when Autoupdate receives SIGTERM (#2479) (Zorg)
+* Update Japanese localization (#2475) (1024jp)
+* Improve Turkish translations (#2464) (Emir SARI)
+* Update Spanish translation for 'You are currently running version %@.' and 'Version History' (#2463) (Billy Gray)
+
+# 2.5.1
+
+* Default to English for XML nodes when no xml:lang is present (#2440) (Zorg)
+* Filter for archive files in generate_appcast more intelligently (#2448) (Zorg)
+* Use correct entitlements and dsym files when using custom bundle id and XPC names in ConfigCommon (#2446) (floorish)
+
+# 2.5.0
+
+* Add ability to adapt release notes based on the currently installed version (#2373) (Nathan Manceaux-Panot)
+* Allow developers to use custom URL schemes in the release notes view (#2393) (Zorg)
+* Adopt cooperative app activation APIs in macOS 14 Sonoma (#2409) (Zorg)
+* Improve permission prompt layout (#2420) (Zorg)
+* Remove hyphenation in "You're up to date" message (#2425) (Zorg, Dom Neill)
+* Pre-warm installs before relaunch and resolve sporadic failures in CI (#2421) (Zorg)
+* Fix make release not building distribution successfully (#2430) (Zorg)
+* Fix Updater app not starting when running Sparkle as root (e.g. from CLI with sudo or a daemon) on macOS 14 Sonoma (#2432) (Zorg)
+* Fix KVO usage for updaterController.updater.* (#2404) (Zorg)
+* Replace CFUUID* with NSUUID (#2395) (Eitot)
+* Report an error when detecting duplicate updates in generate_appcast (#2407) (Zorg)
+* Improve error for rejecting xattr based code signing for delta updates (#2408) (Zorg)
+* Fail gracefully when auxiliary tool cannot be located (#2436) (Zorg)
+
+# 2.4.2
+
+* Ignore release notes download when we shouldn't show release notes (#2381) (Zorg)
+* Fix NSKeyedUnarchiver warning for not specifying keyed NSString class (#2381) (Zorg)
+* Harden verification of Sparkle update download (#2392) (Zorg)
+
+# 2.4.1
+
+* Remove auxiliary apps and relocate symbols in SPM package to resolve missing AvailableLibraries warnings (#2356) (Zorg)
+* Add -Wno-declaration-after-statement to silence warnings that only apply to pre-C99 (#2345) (Kent Sutherland)
+* Fix compile error when setting SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE=0 (#2346) (Zorg)
+* Improve how downloaded update is passed to the installer (#2359) (Zorg)
+
 # 2.4.0
 
-* Ask permission for automatically downloading and installing new updates (#2285) (Zorg)
-* Update `SUVersionDisplay` to better customize and display how versions are shown (#2321) (Zorg)
 * Reduce code size
-  * Enable deployment postprocessing in Release to properly strip debug symbols and strip all non-global symbols (#2286, #2305) (Zerg)
+  * Enable deployment postprocessing in Release to properly strip debug symbols and strip all non-global symbols (#2286, #2305) (Zorg)
   * Remove duplicate Sparkle localization strings in Updater app (#2288) (Zorg)
   * Optimize codebase for generated code size (less properties, direct methods, etc) (#2305) (Zorg)
   * Add additional settings to `ConfigCommon.xcconfig` for disabling features
-* Add deprecations/warnings for incorrect update checking usage (#2295) (Zorg)
+* Ask permission for automatically downloading and installing new updates (#2285) (Zorg)
+* Add support for plain text release notes view that does not use web view (#2315) (Zorg)
+* Update `SUVersionDisplay` to better customize and display how versions are shown (#2321) (Zorg)
+* Add deprecations/warnings for incorrect background update checking usage (#2295) (Zorg)
 * Deprecate `-[SPUUpdater setFeedURL:]` API and add `-[SPUUpdater clearFeedURLFromUserDefaults]` for migrating away from `-[SPUUpdater setFeedURL:]` (#2295)
-* Exit with an error if generate_appcast cannot sign an update that must be signed (#2322) (Zorg)
 * Trigger a new update check in `-[SPUUpdater resetUpdateCycle]` if the updater's feed or allowed channels have changed (#2324) (Zorg)
-* Turn off autolinking for XPC targets to alleviate circular dependency issues (#2332) (Daniel Jalkut)
+* Exit with an error if generate_appcast cannot sign an update that must be signed (#2322) (Zorg)
+* Remove a redundant Apple code signing check when verifying new updates (#2341) (Zorg)
+* Turn off auto-linking for XPC targets to alleviate circular dependency issues (#2332) (Daniel Jalkut)
 
 # 2.3.2
 
@@ -186,6 +257,15 @@ Please visit [Sparkle's website](http://sparkle-project.org) for more informatio
 
 If you are migrating from earlier beta versions of Sparkle 2 and use sandboxing, please re-familiarize yourself with the [Sandboxing guide](https://sparkle-project.org/documentation/sandboxing/). Some of the XPC Services are now optional and integration with XPC Services and code signing have been simplified. The SPUUserDriver protocol for custom user interfaces has been greatly simplified too.
 
+# 1.27.3
+
+ * Create and use temp extraction directory in generate_appcast again (#2556) (Zorg)
+
+# 1.27.2
+
+ * Extract archives in a separate directory from the input archive (#2552) (Zorg)
+ * Fix incorrect xz log warning in make release (#2044) (trss)
+
 # 1.27.1
 
  * Use px instead of pt when specifying font size to fix default font size in WebView from #1962 (regressed in 1.25.0 with WKWebView adoption) (Daniel Jalkut)
@@ -344,7 +424,7 @@ If you are migrating from earlier beta versions of Sparkle 2 and use sandboxing,
 # 1.20.0
 
  * `generate_appcast` option to read private key directly from the keychain (Tamás Lustyik)
- * Add delegate callbacks for fininshed download and extraction related events (Csaba Horony)
+ * Add delegate callbacks for finished download and extraction related events (Csaba Horony)
  * Don't check for updates if Do Not Disturb is on (Kornel)
  * Expose `CodesigningVerifier`, add codesign info API (sunuslee)
  * Threading fixes:
@@ -694,7 +774,7 @@ Important security fixes:
  * All the user defaults keys are now private; instead, SUUpdater is KVC-compliant for automaticallyChecksForUpdates, updateCheckInterval, and feedURL.
 * Reduced the size of the English-only framework by 25%.
 * System profiling information is now only submitted to the server once per week; this will help normalize your statistics across users with different interval preferences.
-* The feedParamatersForUpdater: delegate method now requires "displayKey" and "displayVersion" keys so that it can inform the user what's being sent.
+* The feedParametersForUpdater: delegate method now requires "displayKey" and "displayVersion" keys so that it can inform the user what's being sent.
 * Added a delegate method called pathToRelaunchForUpdater: which can be used for plugins to provide the path which should be used when relaunching the client after installing an update.
 * Added support for xml:lang to pick localized nodes in appcasts (for release notes, etc).
 * Fixed a bug which would cause the "checking for updates" window to not disappear in certain extraordinary error conditions.

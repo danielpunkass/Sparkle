@@ -498,7 +498,7 @@ BOOL createBinaryDelta(NSString *source, NSString *destination, NSString *patchF
                 fprintf(stderr, "\n");
             }
             if (error != NULL) {
-                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Diffing code signed extended attributes are not supported. Detected extended attribute in before-tree on file %@", @(ent->fts_path)] }];
+                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Diffing code signed extended attributes are not supported. Detected extended attribute in before-tree on file %@. For removing code signed extended attributes and improving your bundle's structure, please see https://developer.apple.com/documentation/bundleresources/placing_content_in_a_bundle", @(ent->fts_path)] }];
             }
             return NO;
         }
@@ -616,7 +616,7 @@ BOOL createBinaryDelta(NSString *source, NSString *destination, NSString *patchF
                 fprintf(stderr, "\n");
             }
             if (error != NULL) {
-                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Diffing code signed extended attributes are not supported. Detected extended attribute in after-tree on file %@", @(ent->fts_path)] }];
+                *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Diffing code signed extended attributes are not supported. Detected extended attribute in after-tree on file %@. For removing code signed extended attributes and improving your bundle's structure, please see https://developer.apple.com/documentation/bundleresources/placing_content_in_a_bundle", @(ent->fts_path)] }];
             }
             return NO;
         }
@@ -750,7 +750,7 @@ BOOL createBinaryDelta(NSString *source, NSString *destination, NSString *patchF
       return originalTreeState[key1] ? NSOrderedAscending : NSOrderedDescending;
     }];
     
-    // Using a couple of heursitics we track if files have been moved to other locations within the app bundle
+    // Using a couple of heuristics we track if files have been moved to other locations within the app bundle
     NSMutableDictionary<NSString *, NSString *> *frameworkVersionsSubstitutes = [NSMutableDictionary dictionary];
     NSMutableDictionary<NSString *, NSString *> *fileSubstitutes = [NSMutableDictionary dictionary];
     if (MAJOR_VERSION_IS_AT_LEAST(majorVersion, SUBinaryDeltaMajorVersion3)) {
