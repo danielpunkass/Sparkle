@@ -293,7 +293,7 @@ static NSString *const SUUpdateAlertTouchBarIdentifier = @"" SPARKLE_BUNDLE_IDEN
         BOOL javaScriptEnabled = [_host boolForInfoDictionaryKey:SUEnableJavaScriptKey];
         
 #if DOWNLOADER_XPC_SERVICE_EMBEDDED
-		if ([_host requiresLegacyWebView] == NO) {
+		if ([_host requiresLegacyWebView]) {
 			_releaseNotesView = [[SULegacyWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes];
         } else
 #endif
