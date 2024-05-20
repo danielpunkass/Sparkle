@@ -31,7 +31,7 @@ SPU_OBJC_DIRECT_MEMBERS
 
 @property (getter=isRunningOnReadOnlyVolume, nonatomic, readonly) BOOL runningOnReadOnlyVolume;
 @property (getter=isRunningTranslocated, nonatomic, readonly) BOOL runningTranslocated;
-@property (readonly) BOOL requiresLegacyWebView;
+@property (readonly, nonatomic) BOOL requiresLegacyWebView;
 @property (readonly, nonatomic, copy, nullable) NSString *publicDSAKeyFileKey;
 
 - (nullable id)objectForInfoDictionaryKey:(NSString *)key;

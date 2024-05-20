@@ -293,26 +293,12 @@ static NSString *const SUUpdateAlertTouchBarIdentifier = @"" SPARKLE_BUNDLE_IDEN
         BOOL javaScriptEnabled = [_host boolForInfoDictionaryKey:SUEnableJavaScriptKey];
         
 #if DOWNLOADER_XPC_SERVICE_EMBEDDED
-        // WKWebView has a bug where it won't work in loading local HTML content in sandboxed apps that do not have an outgoing network entitlement
-        // FB6993802: https://twitter.com/sindresorhus/status/1160577243929878528 | https://github.com/feedback-assistant/reports/issues/1
-        // If the developer is using the downloader XPC service, they are very most likely are a) sandboxed b) do not use outgoing network entitlement.
-        // In this case, fall back to legacy WebKit view.
-<<<<<<< HEAD
-        // (In theory it is possible for a non-sandboxed app or sandboxed app with outgoing network entitlement to use the XPC service, it's just pretty unlikely. And falling back to a legacy web view would not be too harmful in those cases).        
-        if ([_host requiresLegacyWebView] == NO) {
-            _releaseNotesView = [[SUWKWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled];
-        } else {
-            _releaseNotesView = [[SULegacyWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled];
-=======
-        // (In theory it is possible for a non-sandboxed app or sandboxed app with outgoing network entitlement to use the XPC service, it's just pretty unlikely. And falling back to a legacy web view would not be too harmful in those cases).
-        BOOL useWKWebView = !SPUXPCServiceIsEnabled(SUEnableDownloaderServiceKey);
-        if (!useWKWebView) {
-            _releaseNotesView = [[SULegacyWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes];
+		if ([_host requiresLegacyWebView] == NO) {
+			_releaseNotesView = [[SULegacyWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes];
         } else
 #endif
         {
             _releaseNotesView = [[SUWKWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes installedVersion: _host.version];
->>>>>>> 2247105ff37ba7b317e65af9833ecbb0f67f81de
         }
     }
     
