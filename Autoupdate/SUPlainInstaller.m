@@ -343,29 +343,31 @@
     }
     
     SUFileManager *fileManager = [[SUFileManager alloc] init];
-    
-    if (@available(macOS 13.0, *)) {
-        NSURL *mainExecutableURL = NSBundle.mainBundle.executableURL;
-        if (mainExecutableURL == nil) {
-            // This shouldn't happen
-            _canPerformSafeAtomicSwap = NO;
-        } else {
-            NSString *installerTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:mainExecutableURL];
-            NSString *bundleTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:bundle.bundleURL];
-            
-            // If the new update is code signed and Autoupdate is not signed with the same Team ID as the new update,
-            // then we may run into Privacy & Security prompt issues from the OS
-            // To avoid these, we skip the gatekeeper scan and skip performing an atomic swap during install
-            _canPerformSafeAtomicSwap = (bundleTeamIdentifier == nil || (installerTeamIdentifier != nil && [installerTeamIdentifier isEqualToString:bundleTeamIdentifier]));
-        }
-    } else {
-        _canPerformSafeAtomicSwap = YES;
-    }
-    
-    if (!_canPerformSafeAtomicSwap) {
-        SULog(SULogLevelDefault, @"Skipping atomic rename/swap and gatekeeper scan because Autoupdate is not signed with same identity as the new update %@", bundle.bundleURL.lastPathComponent);
-    }
-    
+//    
+//    if (@available(macOS 13.0, *)) {
+//        NSURL *mainExecutableURL = NSBundle.mainBundle.executableURL;
+//        if (mainExecutableURL == nil) {
+//            // This shouldn't happen
+//            _canPerformSafeAtomicSwap = NO;
+//        } else {
+//            NSString *installerTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:mainExecutableURL];
+//            NSString *bundleTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:bundle.bundleURL];
+//            
+//            // If the new update is code signed and Autoupdate is not signed with the same Team ID as the new update,
+//            // then we may run into Privacy & Security prompt issues from the OS
+//            // To avoid these, we skip the gatekeeper scan and skip performing an atomic swap during install
+//            _canPerformSafeAtomicSwap = (bundleTeamIdentifier == nil || (installerTeamIdentifier != nil && [installerTeamIdentifier isEqualToString:bundleTeamIdentifier]));
+//        }
+//    } else {
+//        _canPerformSafeAtomicSwap = YES;
+//    }
+//    
+//    if (!_canPerformSafeAtomicSwap) {
+//        SULog(SULogLevelDefault, @"Skipping atomic rename/swap and gatekeeper scan because Autoupdate is not signed with same identity as the new update %@", bundle.bundleURL.lastPathComponent);
+//    }
+//    
+    _canPerformSafeAtomicSwap = NO;
+
     _newAndOldBundlesOnSameVolume = [fileManager itemAtURL:bundle.bundleURL isOnSameVolumeItemAsURL:_host.bundle.bundleURL];
     
     // We can do a lot of the installation work ahead of time if the new app update does not need to be copied to another volume
