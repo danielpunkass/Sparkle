@@ -14,8 +14,12 @@
 NS_ASSUME_NONNULL_BEGIN
 
 #ifndef BUILDING_SPARKLE_TESTS
-SPU_OBJC_DIRECT_MEMBERS
+#define SUCodeSigningVerifierDefinitionAttribute SPU_OBJC_DIRECT_MEMBERS
+#else
+#define SUCodeSigningVerifierDefinitionAttribute __attribute__((objc_runtime_name("SUTestCodeSigningVerifier")))
 #endif
+
+SUCodeSigningVerifierDefinitionAttribute
 @interface SUCodeSigningVerifier : NSObject
 
 + (BOOL)codeSignatureIsValidAtBundleURL:(NSURL *)newBundleURL andMatchesSignatureAtBundleURL:(NSURL *)oldBundleURL error:(NSError **)error;
@@ -24,6 +28,8 @@ SPU_OBJC_DIRECT_MEMBERS
 
 // Same as above except does not check for nested code. This method should be used by the framework.
 + (BOOL)codeSignatureIsValidAtBundleURL:(NSURL *)bundleURL error:(NSError *__autoreleasing *)error;
+
++ (BOOL)codeSignatureIsValidAtDownloadURL:(NSURL *)downloadURL andMatchesDeveloperIDTeamFromOldBundleURL:(NSURL *)oldBundleURL error:(NSError * __autoreleasing *)error;
 
 + (BOOL)bundleAtURLIsCodeSigned:(NSURL *)bundleURL;
 

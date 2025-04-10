@@ -76,6 +76,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     BOOL _showingPermissionRequest;
     BOOL _loggedATSWarning;
     BOOL _loggedNoSecureKeyWarning;
+    BOOL _loggedUpdateSecurityPolicyWarning;
     BOOL _updatingMainBundle;
 }
 
@@ -329,11 +330,18 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     if (!hasAnyPublicKey) {
         if ((feedURL != nil && !servingOverHttps) || ![SUCodeSigningVerifier bundleAtURLIsCodeSigned:[[self hostBundle] bundleURL]]) {
             if (error != NULL) {
-                *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUNoPublicDSAFoundError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"For security reasons, updates need to be signed with an EdDSA key for %@. See Sparkle's documentation for more information.", hostName] }];
+                *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUNoPublicDSAFoundError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"For security reasons, updates need to be signed with an EdDSA key for %@. Visit Sparkle's documentation for more information.", hostName] }];
             }
             return NO;
         } else {
-            if (_updatingMainBundle && !_loggedNoSecureKeyWarning) {
+            BOOL verifyBeforeExtraction = [_host boolForInfoDictionaryKey:SUVerifyUpdateBeforeExtractionKey];
+            
+            if (verifyBeforeExtraction) {
+                if (error != NULL) {
+                    *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUNoPublicDSAFoundError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"For security reasons, updates need to be signed with an EdDSA key because %@ is specified for %@. Visit Sparkle's documentation for more information.", SUVerifyUpdateBeforeExtractionKey, hostName] }];
+                }
+                return NO;
+            } else if (_updatingMainBundle && !_loggedNoSecureKeyWarning) {
                 SULog(SULogLevelError, @"Error: Serving updates without an EdDSA key and only using Apple Code Signing is deprecated and may be unsupported in a future release. Visit Sparkle's documentation for more information: https://sparkle-project.org/documentation/#3-segue-for-security-concerns");
                 
                 _loggedNoSecureKeyWarning = YES;
@@ -349,6 +357,14 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         }
     }
     
+    if (_updatingMainBundle) {
+        if (!_loggedUpdateSecurityPolicyWarning && mainBundleHost.hasUpdateSecurityPolicy) {
+            SULog(SULogLevelDefault, @"Warning: %@ has a custom NSUpdateSecurityPolicy in its Info.plist. This may cause issues when installing updates. Please consider removing this key for your builds using Sparkle if you do not really require a custom update security policy.", hostName);
+            
+            _loggedUpdateSecurityPolicyWarning = YES;
+        }
+    }
+    
     return YES;
 }
 
@@ -361,19 +377,18 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
     id<SPUUpdaterDelegate> delegate = _delegate;
     
-    // If the user has been asked about automatic checks, don't bother prompting
+    // If the user has been asked about automatic checks or the developer has overridden the setting, don't bother prompting
     // When the user answers to the permission prompt, this will be set to either @YES or @NO instead of nil
-    if ([_host objectForUserDefaultsKey:SUEnableAutomaticChecksKey] != nil) {
+    if ([_host objectForKey:SUEnableAutomaticChecksKey] != nil) {
         shouldPrompt = NO;
     }
     // Does the delegate want to take care of the logic for when we should ask permission to update?
     else if ([delegate respondsToSelector:@selector((updaterShouldPromptForPermissionToCheckForUpdates:))]) {
         shouldPrompt = [delegate updaterShouldPromptForPermissionToCheckForUpdates:self];
     }
-    // Has the user been asked already? And don't ask if the host has a default value set in its Info.plist.
-    else if ([_host objectForKey:SUEnableAutomaticChecksKey] == nil) {
+    else {
         // We wait until the second launch of the updater for this host bundle, unless explicitly overridden via SUPromptUserOnFirstLaunchKey.
-        shouldPrompt = [_host objectForKey:SUPromptUserOnFirstLaunchKey] || hasLaunchedBefore;
+        shouldPrompt = hasLaunchedBefore || [_host boolForInfoDictionaryKey:SUPromptUserOnFirstLaunchKey];
     }
     
     if (!hasLaunchedBefore) {

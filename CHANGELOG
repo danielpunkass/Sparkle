@@ -1,3 +1,51 @@
+# 2.7.0
+
+* Unarchiver / validation improvements (Zorg)
+  * Remove old checksum verification checks for dmg archives to improve extraction speed (#2568) (Zorg)
+  * Skip extracting auxiliary files and improve extraction progress for disk images (#2569) (Zorg)
+  * Improve robustness around extracting dmg's with passwords (#2627, #2571) (Zorg)
+  * Randomize the download archive name the installer extracts/executes (#2584) (Zorg)
+  * Retry extracting zip file without piping if extraction fails to workaround bug prior to macOS 15 (#2616) (Zorg)
+  * Add opt-in SUVerifyUpdateBeforeExtraction option to force verification of updates before extraction (#2667) (Zorg)
+  * Add support for extracting Apple Archives (.aar files; requires SUVerifyUpdateBeforeExtraction, macOS 10.15+) (#2586, #2588, #2590) (Zorg)
+  * Don't allow removal of signing keys more strictly (#2647) (Zorg)
+  * Remove SPARKLE_BUILD_DMG_SUPPORT option (#2690) (Zorg)
+* Add new BinaryDelta format (version 4) (Zorg)
+  * Preserve bundle creation date when creating and applying delta updates (#2583) (Zorg)
+  * Use faster crc32 hashes for binary delta version 4 (#2638) (Zorg)
+  * Make binary delta version 4 the default (#2668) (Zorg)
+* Language / layout improvements
+  * Fix recovery error suggestion not shown when app is translocated or on read-only mount (#2689) (Zorg)
+  * Fix typo in Dutch localisation (#2642) (Eitot)
+  * Add baseline alignment to status text in SUStatus dialog (#2587) (Eitot)
+  * Make horizontal hugging priority required for status text field (#2614) (Zorg)
+  * Adjust the layout of anonymous system profile info to align better with the rest of the panel's UI (#2564) (Daniel Jalkut)
+  * Fix typo in Dutch localisation (#2642) (Eitot)
+  * Internationalize system profile display keys (#2577) (Zorg)
+  * Update hebrew locale and add right-to-left characters (#2573, #2576, #2578, #2579) (Shlomo)
+  * Update localisations for Dutch and German (#2582) (Eitot)
+  * Add unlocalized strings in Japanese (#2589) (1024jp)
+  * Fix typo in LICENSE (#2648) (fujisoft)
+* Deprecate custom version comparators  (#2639) (Zorg)
+* Skip preflight update check in sparkle-cli if user is root (#2645) (Zorg)
+* Avoid assert/crash when app is moved before update alert shows (#2658) (Zorg)
+* Use default NSURLRequest timeoutInterval for the downloader (currently 60s) (#2673) (Zorg)
+* Fix process substitution failing to work for providing the private key as file argument (#2615) (Zorg)
+* Improve unable decode private key error messages in generate_appcast (#2675) (Zorg)
+* Clarify that default channel must be in allowed channels set in API documentation (#2676) (Zorg)
+* Call update permission prompt delegate method only when needed (#2622) (Zorg)
+* Resolve duplicate class definitions from BinaryDelta, Sparkle Test App, and unit tests (#2570, #2629) (Zorg)
+
+# 2.6.4
+
+* Fix app modification prompt from appearing when downloaded update overrides NSUpdateSecurityPolicy (#2593)
+
+# 2.6.3
+
+* Guard update timer update check against sessionInProgress to fix rare crash when checking for updates (#2561)
+* Remove extra writeData: call when unarchiving disk images (#2562)
+* Ignore crashes due to SIGPIPE in generate_appcast when failing to extract zip files (#2563)
+
 # 2.6.2
 
 * Create and use temp extraction directory in generate_appcast again (#2555) (Zorg)
