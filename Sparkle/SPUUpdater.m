@@ -409,7 +409,9 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         
         _showingPermissionRequest = YES;
         [self setSessionInProgress:YES];
-        [self setCanCheckForUpdates:YES];
+        
+        BOOL canShowUserDriverInFocusDuringPermissionPrompt = [_userDriver respondsToSelector:@selector(showUpdateInFocus)];
+        [self setCanCheckForUpdates:canShowUserDriverInFocusDuringPermissionPrompt];
         
         __weak __typeof__(self) weakSelf = self;
         [_userDriver showUpdatePermissionRequest:updatePermissionRequest reply:^(SUUpdatePermissionResponse *response) {
@@ -420,6 +422,11 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
                     strongSelf->_showingPermissionRequest = NO;
                     
                     [strongSelf updatePermissionRequestFinishedWithResponse:response];
+                    
+                    if (!canShowUserDriverInFocusDuringPermissionPrompt) {
+                        [strongSelf setCanCheckForUpdates:YES];
+                    }
+                    
                     // Schedule checks, but make sure we ignore the delayed call from KVO
                     [strongSelf resetUpdateCycle];
                 }
@@ -635,6 +642,10 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     if (_showingPermissionRequest || _driver.showingUpdate) {
         if ([_userDriver respondsToSelector:@selector(showUpdateInFocus)]) {
             [_userDriver showUpdateInFocus];
+        } else {
+            NSString *noticeType = _showingPermissionRequest ? @"permission request" : @"update";
+            
+            SULog(SULogLevelError, @"Error: checkForUpdates called but %@ is being shown and %@ does not implement -[SPUUserDriver showUpdateInFocus]", noticeType, _userDriver);
         }
         return;
     }
@@ -809,9 +820,11 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         }
     }];
     
-    [_driver setUpdateShownHandler:^{
-        weakSelf.canCheckForUpdates = YES;
-    }];
+    if ([_userDriver respondsToSelector:@selector(showUpdateInFocus)]) {
+        [_driver setUpdateShownHandler:^{
+            weakSelf.canCheckForUpdates = YES;
+        }];
+    }
     
     [_driver setUpdateWillInstallHandler:^{
         [weakSelf updateLastUpdateCheckDate];
