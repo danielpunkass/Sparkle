@@ -1094,12 +1094,17 @@ static NSString *escapeURLComponent(NSString *str) {
     BOOL sendingSystemProfile = [self sendsSystemProfile];
 
     // Let's only send the system profiling information once per week at most, so we normalize daily-checkers vs. biweekly-checkers and the such.
-    NSDate *lastSubmitDate = [_host objectForUserDefaultsKey:SULastProfileSubmitDateKey];
-    if (!lastSubmitDate) {
-        lastSubmitDate = [NSDate distantPast];
+    if (sendingSystemProfile) {
+        NSDate *lastSubmitDate = [_host objectForUserDefaultsKey:SULastProfileSubmitDateKey];
+        if (!lastSubmitDate) {
+            lastSubmitDate = [NSDate distantPast];
+        }
+        const NSTimeInterval oneWeek = 60 * 60 * 24 * 7;
+        NSTimeInterval timeSinceLastSubmission = [lastSubmitDate timeIntervalSinceNow] * -1;
+        if (timeSinceLastSubmission < oneWeek) {
+            sendingSystemProfile = NO;
+        }
     }
-    const NSTimeInterval oneWeek = 60 * 60 * 24 * 7;
-    sendingSystemProfile &= (-[lastSubmitDate timeIntervalSinceNow] >= oneWeek);
 
     id<SPUUpdaterDelegate> delegate = _delegate;
     NSArray<NSDictionary<NSString *, NSString *> *> *parameters = @[];
