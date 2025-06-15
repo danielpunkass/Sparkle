@@ -163,14 +163,11 @@ GCC_WARN_UNUSED_LABEL = YES
 GCC_WARN_UNUSED_PARAMETER = YES
 GCC_WARN_UNUSED_VARIABLE = YES
 
-// These should be removed once the conversion to ARC is complete
-WARNING_CFLAGS_EXTRA = -Wno-custom-atomic-properties -Wno-implicit-atomic-properties
-
-// New in Xcode 13 - yields several warnings in Sparkle that I just want to suppress for now.
-WARNING_CFLAGS_ALLOW_COMPLETION_HANDLER_MISUSE = -Wno-completion-handler
+// New in Xcode 26 - disable warnings about _ prefixed global variables
+WARNING_CFLAGS_ALLOW_UNDERSCORES = -Wno-reserved-identifier
 
 // Turn on all warnings, then disable a few which are almost impossible to avoid
-WARNING_CFLAGS = -Wall -Weverything -Wno-unused-macros -Wno-gnu-statement-expression -Wno-auto-import -Wno-gnu-zero-variadic-macro-arguments -Wno-format-non-iso -Wno-direct-ivar-access -Wno-declaration-after-statement -Wno-gnu-conditional-omitted-operand -Wno-switch-default -Wno-missing-include-dirs -Werror=undef
+WARNING_CFLAGS = -Wall -Weverything -Wno-unused-macros -Wno-gnu-statement-expression -Wno-auto-import -Wno-gnu-zero-variadic-macro-arguments -Wno-format-non-iso -Wno-direct-ivar-access -Wno-declaration-after-statement -Wno-gnu-conditional-omitted-operand -Wno-switch-default -Wno-missing-include-dirs -Werror=undef $(WARNING_CFLAGS_ALLOW_UNDERSCORES)
 
 // Disable Copy Phase Strip to avoid warnings at build time because of already signed code
 COPY_PHASE_STRIP = NO
