@@ -1609,6 +1609,100 @@ typedef void (^SUDeltaHandler)(NSFileManager *fileManager, NSString *sourceDirec
     }];
 }
 
+- (void)testFrameworkVersionChangedWithDirectoryToFileChange
+{
+    [self createAndApplyPatchWithHandler:^(NSFileManager *fileManager, NSString *sourceDirectory, NSString *destinationDirectory) {
+        NSString *sourceA = [sourceDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/A/"];
+        NSString *destinationB = [destinationDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/B/"];
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:sourceA withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([fileManager createDirectoryAtPath:destinationB withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        
+        NSString *sourceFileDirectory = [sourceA stringByAppendingPathComponent:@"A"];
+        NSString *sourceFileInDirectory = [sourceFileDirectory stringByAppendingPathComponent:@"B"];
+        
+        NSString *destinationFile = [destinationB stringByAppendingPathComponent:@"A"];
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:sourceFileDirectory withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([[self bigData1] writeToFile:sourceFileInDirectory atomically:YES]);
+        
+        XCTAssertTrue([[self bigData2] writeToFile:destinationFile atomically:YES]);
+        
+        XCTAssertFalse([self testDirectoryHashEqualityWithSource:sourceDirectory destination:destinationDirectory]);
+    }];
+}
+
+- (void)testFrameworkVersionChangedWithFileToDirectoryChange
+{
+    [self createAndApplyPatchWithHandler:^(NSFileManager *fileManager, NSString *sourceDirectory, NSString *destinationDirectory) {
+        NSString *sourceA = [sourceDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/A/"];
+        NSString *destinationB = [destinationDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/B/"];
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:sourceA withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([fileManager createDirectoryAtPath:destinationB withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        
+        NSString *sourceFile = [sourceA stringByAppendingPathComponent:@"A"];
+        
+        NSString *destinationFileDirectory = [destinationB stringByAppendingPathComponent:@"A"];
+        NSString *destinationFileInDirectory = [destinationFileDirectory stringByAppendingPathComponent:@"B"];
+        
+        XCTAssertTrue([[self bigData2] writeToFile:sourceFile atomically:YES]);
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:destinationFileDirectory withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([[self bigData1] writeToFile:destinationFileInDirectory atomically:YES]);
+        
+        XCTAssertFalse([self testDirectoryHashEqualityWithSource:sourceDirectory destination:destinationDirectory]);
+    }];
+}
+
+- (void)testFrameworkVersionChangedWithSymbolicLinkToFileChange
+{
+    [self createAndApplyPatchWithHandler:^(NSFileManager *fileManager, NSString *sourceDirectory, NSString *destinationDirectory) {
+        NSString *sourceA = [sourceDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/A/"];
+        NSString *destinationB = [destinationDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/B/"];
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:sourceA withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([fileManager createDirectoryAtPath:destinationB withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        
+        NSString *sourceFile = [sourceA stringByAppendingPathComponent:@"A"];
+        NSString *destinationFile = [destinationB stringByAppendingPathComponent:@"A"];
+        
+        NSError *error = nil;
+        if (![fileManager createSymbolicLinkAtPath:sourceFile withDestinationPath:@"C" error:&error]) {
+            NSLog(@"Error in creating symlink: %@", error);
+            XCTFail(@"Failed to create symlink");
+        }
+        
+        XCTAssertTrue([[self bigData2] writeToFile:destinationFile atomically:YES]);
+        
+        XCTAssertFalse([self testDirectoryHashEqualityWithSource:sourceDirectory destination:destinationDirectory]);
+    }];
+}
+
+- (void)testFrameworkVersionChangedWithFileToSymbolicLinkChange
+{
+    [self createAndApplyPatchWithHandler:^(NSFileManager *fileManager, NSString *sourceDirectory, NSString *destinationDirectory) {
+        NSString *sourceA = [sourceDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/A/"];
+        NSString *destinationB = [destinationDirectory stringByAppendingPathComponent:@"Frameworks/Foo.framework/Versions/B/"];
+        
+        XCTAssertTrue([fileManager createDirectoryAtPath:sourceA withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        XCTAssertTrue([fileManager createDirectoryAtPath:destinationB withIntermediateDirectories:YES attributes:NULL error:NULL]);
+        
+        NSString *sourceFile = [sourceA stringByAppendingPathComponent:@"A"];
+        NSString *destinationFile = [destinationB stringByAppendingPathComponent:@"A"];
+        
+        XCTAssertTrue([[self bigData2] writeToFile:sourceFile atomically:YES]);
+        
+        NSError *error = nil;
+        if (![fileManager createSymbolicLinkAtPath:destinationFile withDestinationPath:@"C" error:&error]) {
+            NSLog(@"Error in creating symlink: %@", error);
+            XCTFail(@"Failed to create symlink");
+        }
+        
+        XCTAssertFalse([self testDirectoryHashEqualityWithSource:sourceDirectory destination:destinationDirectory]);
+    }];
+}
+
 - (void)testOddPermissionsInAfterTree
 {
     BOOL success = [self createAndApplyPatchWithBeforeDiffHandler:^(NSFileManager *fileManager, NSString *sourceDirectory, NSString *destinationDirectory) {

@@ -144,6 +144,13 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (BOOL)startUpdater:(NSError * __autoreleasing *)error
 {
+    if (![NSThread isMainThread]) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUInvalidUpdaterError userInfo:@{ NSLocalizedDescriptionKey: @"-[SPUUpdater startUpdater:] must be called on the main thread]"}];
+        }
+        return NO;
+    }
+    
     if (_startedUpdater) {
         return YES;
     }
@@ -158,6 +165,8 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     
     _startedUpdater = YES;
     [self setCanCheckForUpdates:YES];
+    
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(updateAutomaticCheckSettingChanged:) name:SUUpdateAutomaticCheckSettingChangedNotification object:nil];
     
     // Start updater on next update cycle so we make sure the application invoking the updater is ready
     // This also gives the developer a cycle to check for updates before Sparkle's update cycle scheduler kicks in
@@ -453,6 +462,10 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (NSDate *)lastUpdateCheckDate
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater lastUpdateCheckDate] must be called on the main thread.");
+    }
+    
     if (_updateLastCheckedDate == nil)
     {
         _updateLastCheckedDate = [_host objectForUserDefaultsKey:SULastCheckTimeKey];
@@ -612,6 +625,16 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 // Sparkle internally uses _checkForUpdatesInBackground
 - (void)checkForUpdatesInBackground
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater checkForUpdatesInBackground] can only be called on the main thread");
+        
+        // Try to be nice and dispatch on main thread anyway
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self checkForUpdatesInBackground];
+        });
+        return;
+    }
+
     if (!_startedUpdater) {
         SULog(SULogLevelError, @"Error: checkForUpdatesInBackground - updater hasn't been started yet. Please call -startUpdater: first");
         return;
@@ -639,6 +662,17 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (void)checkForUpdates
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater checkForUpdates] can only be called on the main thread");
+        
+        // Try to be nice and dispatch on main thread anyway
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self checkForUpdates];
+        });
+        
+        return;
+    }
+
     if (_showingPermissionRequest || _driver.showingUpdate) {
         if ([_userDriver respondsToSelector:@selector(showUpdateInFocus)]) {
             [_userDriver showUpdateInFocus];
@@ -685,6 +719,17 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (void)checkForUpdateInformation
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater checkForUpdateInformation] can only be called on the main thread");
+        
+        // Try to be nice and dispatch on main thread anyway
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self checkForUpdateInformation];
+        });
+        
+        return;
+    }
+
     __weak __typeof__(self) weakSelf = self;
     if (!_startedUpdater) {
         SULog(SULogLevelError, @"Error: checkForUpdateInformation - updater hasn't been started yet. Please call -startUpdater: first");
@@ -811,6 +856,11 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
             [strongSelf setSessionInProgress:NO];
             [strongSelf setCanCheckForUpdates:YES];
             
+            if (!strongSelf->_updatingMainBundle && error == nil && !shouldShowUpdateImmediately && resumableUpdate == nil) {
+                // If we're not updating the main bundle, a potentially new installed bundle may have different info
+                [NSNotificationCenter.defaultCenter postNotificationName:SUUpdateSettingsNeedsSynchronizationNotification object:nil userInfo:@{SUUpdateBundlePathUserInfoKey: strongSelf->_host.bundlePath}];
+            }
+            
             notifyDelegateOfDriverCompletion(error, shouldShowUpdateImmediately);
             
             // Ensure the delegate doesn't start a new session when being notified of the previous one ending
@@ -869,6 +919,16 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (void)resetUpdateCycle
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater resetUpdateCycle] must be called on the main thread.");
+        
+        // Try to be nice and dispatch on main thread anyway
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self resetUpdateCycle];
+        });
+        return;
+    }
+    
     if (!_startedUpdater) {
         SULog(SULogLevelError, @"Error: resetUpdateCycle - updater hasn't been started yet. Please call -startUpdater: first");
         return; // not even ready yet
@@ -907,38 +967,87 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (void)resetUpdateCycleAfterShortDelay
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater resetUpdateCycleAfterShortDelay] must be called on the main thread.");
+        
+        // Try to be nice and dispatch on main thread anyway
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self resetUpdateCycleAfterShortDelay];
+        });
+        return;
+    }
+    
     [self cancelNextUpdateCycle];
     [_updaterCycle resetUpdateCycleAfterDelay];
 }
 
 - (void)setAutomaticallyChecksForUpdates:(BOOL)automaticallyCheckForUpdates
 {
-    [_host setBool:automaticallyCheckForUpdates forUserDefaultsKey:SUEnableAutomaticChecksKey];
-    // Hack to support backwards compatibility with older Sparkle versions, which supported
-    // disabling updates by setting the check interval to 0.
-    if (automaticallyCheckForUpdates && (NSInteger)[self updateCheckInterval] == 0) {
-        [self setUpdateCheckInterval:SUDefaultUpdateCheckInterval];
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater setAutomaticallyChecksForUpdates:] must be called on the main thread.");
     }
     
-    if (_startedUpdater) {
+    _updaterSettings.automaticallyChecksForUpdates = automaticallyCheckForUpdates;
+}
+
+- (BOOL)automaticallyChecksForUpdates
+{
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater automaticallyChecksForUpdates] must be called on the main thread.");
+    }
+    
+    return [_updaterSettings automaticallyChecksForUpdates];
+}
+
+- (void)updateAutomaticCheckSettingChanged:(NSNotification *)notification
+{
+    NSString *bundlePath = notification.userInfo[SUUpdateBundlePathUserInfoKey];
+    if (![bundlePath isEqualToString:_host.bundlePath]) {
+        return;
+    }
+    
+    if (_startedUpdater && !_sessionInProgress) {
         // Provide a small delay in case multiple preferences are being updated simultaneously.
         [self resetUpdateCycleAfterShortDelay];
     }
 }
 
-- (BOOL)automaticallyChecksForUpdates
++ (NSSet<NSString *> *)keyPathsForValuesAffectingAutomaticallyChecksForUpdates
 {
-    return [_updaterSettings automaticallyChecksForUpdates];
+    return [NSSet setWithObject:@"updaterSettings.automaticallyChecksForUpdates"];
+}
+
++ (BOOL)automaticallyNotifiesObserversOfAutomaticallyChecksForUpdates
+{
+    return NO;
 }
 
 - (void)setAutomaticallyDownloadsUpdates:(BOOL)automaticallyUpdates
 {
-    [_host setBool:automaticallyUpdates forUserDefaultsKey:SUAutomaticallyUpdateKey];
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater setAutomaticallyDownloadsUpdates:] must be called on the main thread.");
+    }
+    
+    _updaterSettings.automaticallyDownloadsUpdates = automaticallyUpdates;
 }
 
 - (BOOL)automaticallyDownloadsUpdates
 {
-    return [_updaterSettings allowsAutomaticUpdates] && [_updaterSettings automaticallyDownloadsUpdates];
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater automaticallyDownloadsUpdates] must be called on the main thread.");
+    }
+    
+    return [_updaterSettings automaticallyDownloadsUpdates];
+}
+
++ (NSSet<NSString *> *)keyPathsForValuesAffectingAutomaticallyDownloadsUpdates
+{
+    return [NSSet setWithObject:@"updaterSettings.automaticallyDownloadsUpdates"];
+}
+
++ (BOOL)automaticallyNotifiesObserversOfAutomaticallyDownloadsUpdates
+{
+    return NO;
 }
 
 - (void)setFeedURL:(NSURL * _Nullable)feedURL
@@ -1055,12 +1164,30 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
 
 - (void)setSendsSystemProfile:(BOOL)sendsSystemProfile
 {
-    [_host setBool:sendsSystemProfile forUserDefaultsKey:SUSendProfileInfoKey];
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater setSendsSystemProfile:] must be called on the main thread.");
+    }
+    
+    _updaterSettings.sendsSystemProfile = sendsSystemProfile;
 }
 
 - (BOOL)sendsSystemProfile
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater sendsSystemProfile] must be called on the main thread.");
+    }
+    
     return [_updaterSettings sendsSystemProfile];
+}
+
++ (NSSet<NSString *> *)keyPathsForValuesAffectingSendsSystemProfile
+{
+    return [NSSet setWithObject:@"updaterSettings.sendsSystemProfile"];
+}
+
++ (BOOL)automaticallyNotifiesObserversOfSendsSystemProfile
+{
+    return NO;
 }
 
 static NSString *escapeURLComponent(NSString *str) {
@@ -1150,24 +1277,38 @@ static NSString *escapeURLComponent(NSString *str) {
 
 - (void)setUpdateCheckInterval:(NSTimeInterval)updateCheckInterval
 {
-    [_host setObject:@(updateCheckInterval) forUserDefaultsKey:SUScheduledCheckIntervalKey];
-    if ((NSInteger)updateCheckInterval == 0) { // For compatibility with 1.1's settings.
-        [self setAutomaticallyChecksForUpdates:NO];
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater setUpdateCheckInterval:] must be called on the main thread.");
     }
     
-    if (_startedUpdater) {
-        // Provide a small delay in case multiple preferences are being updated simultaneously.
-        [self resetUpdateCycleAfterShortDelay];
-    }
+    _updaterSettings.updateCheckInterval = updateCheckInterval;
 }
 
 - (NSTimeInterval)updateCheckInterval
 {
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater updateCheckInterval] must be called on the main thread.");
+    }
+    
     return [_updaterSettings updateCheckInterval];
+}
+
++ (NSSet<NSString *> *)keyPathsForValuesAffectingUpdateCheckInterval
+{
+    return [NSSet setWithObject:@"updaterSettings.updateCheckInterval"];
+}
+
++ (BOOL)automaticallyNotifiesObserversOfUpdateCheckInterval
+{
+    return NO;
 }
 
 - (void)dealloc
 {
+    if (_startedUpdater) {
+        [NSNotificationCenter.defaultCenter removeObserver:self name:SUUpdateAutomaticCheckSettingChangedNotification object:nil];
+    }
+    
     // Stop checking for updates
     [self cancelNextUpdateCycle];
     [_updaterTimer invalidate];
