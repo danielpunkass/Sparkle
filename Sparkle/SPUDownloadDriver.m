@@ -81,13 +81,20 @@
                     if (strongSelf != nil && !strongSelf->_retrievedDownloadResult && !strongSelf->_cleaningUp) {
                         strongSelf->_downloader = nil;
                         
-                        // We can't enforce com.apple.security.network.client == NO or it being absent for sandboxed clients,
-                        // but we should warn about it anyway
-                        SULog(SULogLevelError, @"Error: Connection to update downloader was invalidated. If your app is not sandboxed or has com.apple.security.network.client set to YES, please remove %@ from your Info.plist. Otherwise please check Console logs for "@DOWNLOADER_NAME" if there are any additional details.", SUEnableDownloaderServiceKey);
+                        NSString *additionalFailureReason;
+                        {
+                            NSString *executableFailureReason;
+                            if (!SPUXPCServiceHasExecutablePermission(@DOWNLOADER_NAME, &executableFailureReason)) {
+                                additionalFailureReason = [NSString stringWithFormat:@" %@", executableFailureReason];
+                            } else {
+                                additionalFailureReason = @"";
+                            }
+                        }
                         
                         NSDictionary *userInfo =
                         @{
                           NSLocalizedDescriptionKey: SULocalizedStringFromTableInBundle(@"An error occurred while downloading the update. Please try again later.", SPARKLE_TABLE, SUSparkleBundle(), nil),
+                          NSLocalizedFailureReasonErrorKey: [NSString stringWithFormat:@"If your app is not sandboxed or has com.apple.security.network.client set to YES, please remove %@ from your Info.plist. Please also check Console logs for "@DOWNLOADER_NAME" if there are any additional details.%@", SUEnableDownloaderServiceKey, additionalFailureReason]
                           };
                         
                         NSError *downloadError = [NSError errorWithDomain:SUSparkleErrorDomain code:SUDownloadError userInfo:userInfo];

@@ -186,9 +186,19 @@
             if (strongSelf != nil && strongSelf->_installerConnection != nil && !strongSelf->_aborted) {
                 NSString *impactedTools = usingInstallerService ? (@SPARKLE_RELAUNCH_TOOL_NAME" and "@INSTALLER_LAUNCHER_NAME) : @SPARKLE_RELAUNCH_TOOL_NAME;
                 
+                NSString *additionalFailureReason;
+                {
+                    NSString *executableFailureReason;
+                    if (!SPUHelperHasExecutablePermission(@SPARKLE_RELAUNCH_TOOL_NAME, &executableFailureReason) || !SPUHelperHasExecutablePermission(@SPARKLE_INSTALLER_PROGRESS_TOOL_NAME@".app/Contents/MacOS/"@SPARKLE_INSTALLER_PROGRESS_TOOL_NAME, &executableFailureReason)) {
+                        additionalFailureReason = executableFailureReason;
+                    } else {
+                        additionalFailureReason = [NSString stringWithFormat:@"If your application is sandboxed, please ensure Installer Connection & Status entitlements are correctly set up: https://sparkle-project.org/documentation/sandboxing/ . Otherwise if %@ %@ not adhoc signed, your app must be signed with a matching team ID", impactedTools, (usingInstallerService ? @"are" : @"is")];
+                    }
+                }
+                
                 NSDictionary *genericUserInfo = @{
                     NSLocalizedDescriptionKey: SULocalizedStringFromTableInBundle(@"An error occurred while running the updater. Please try again later.", SPARKLE_TABLE, SUSparkleBundle(), nil),
-                    NSLocalizedFailureReasonErrorKey:[NSString stringWithFormat:@"The remote port connection was invalidated from the updater. If your application is sandboxed, please ensure Installer Connection & Status entitlements are correctly set up: https://sparkle-project.org/documentation/sandboxing/ . Otherwise if %@ %@ not adhoc signed, your app must be signed with a matching team ID. For additional details, check Console logs for %@", impactedTools, (usingInstallerService ? @"are" : @"is"), impactedTools]
+                    NSLocalizedFailureReasonErrorKey:[NSString stringWithFormat:@"The remote port connection was invalidated from the updater. %@. For additional details, check Console logs for %@", additionalFailureReason, impactedTools]
                 };
                 
                 [strongSelf _reportInstallerError:strongSelf->_installerError genericErrorCode:SUInstallationError genericUserInfo:genericUserInfo];
@@ -412,9 +422,19 @@
 #endif
                 if (!retrievedLaunchStatus) {
 #pragma clang diagnostic pop
+                    NSString *additionalFailureReason;
+                    {
+                        NSString *executableFailureReason;
+                        if (!SPUXPCServiceHasExecutablePermission(@INSTALLER_LAUNCHER_NAME, &executableFailureReason)) {
+                            additionalFailureReason = [NSString stringWithFormat:@" %@", executableFailureReason];
+                        } else {
+                            additionalFailureReason = @"";
+                        }
+                    }
+                    
                     NSError *error =
                     [NSError errorWithDomain:SUSparkleErrorDomain code:SUInstallationError userInfo:@{ NSLocalizedDescriptionKey:SULocalizedStringFromTableInBundle(@"An error occurred while connecting to the installer. Please try again later.", SPARKLE_TABLE, SUSparkleBundle(), nil),
-                        NSLocalizedFailureReasonErrorKey: [NSString stringWithFormat:@"If your app is not sandboxed, please remove or disable %@ in your app's Info.plist. Otherwise please check Console logs for "@INSTALLER_LAUNCHER_NAME" and "@SPARKLE_RELAUNCH_TOOL_NAME" processes if there are additional details.", SUEnableInstallerLauncherServiceKey]}];
+                        NSLocalizedFailureReasonErrorKey: [NSString stringWithFormat:@"If your app is not sandboxed, please remove or disable %@ in your app's Info.plist. Please also check Console logs for "@INSTALLER_LAUNCHER_NAME" and "@SPARKLE_RELAUNCH_TOOL_NAME" processes if there are additional details.%@", SUEnableInstallerLauncherServiceKey, additionalFailureReason]}];
                     
                     completionHandler(error);
                     
