@@ -1,3 +1,11 @@
+# 2.8.1
+
+* Enforce RunAtLoad to reduce potential timeout issue when launching updater task (#2795) (Zorg)
+* Add missing executable bit permission warnings on connection failure (#2792) (Zorg)
+* Add missing localizations to zh-CN & zh-TW (#2789, #2791) (Francis Feng)
+* Add documentation note for delegates being weakly referenced (#2802) (Zorg)
+* Include app name in startUpdater: failure in SPUStandardUpdaterController (#2780) (Zorg)
+
 # 2.8.0
 
 * UI modernization and macOS Tahoe support
