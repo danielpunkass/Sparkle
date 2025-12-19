@@ -421,6 +421,16 @@ class ArchiveItem: CustomStringConvertible {
             return plainTextReleaseNotes
         }
         
+        let markdownReleaseNotes = basename.appendingPathExtension("md")
+        if FileManager.default.fileExists(atPath: markdownReleaseNotes.path) {
+            return markdownReleaseNotes
+        }
+        
+        let markdownSecondaryReleaseNotes = basename.appendingPathExtension("markdown")
+        if FileManager.default.fileExists(atPath: markdownSecondaryReleaseNotes.path) {
+            return markdownSecondaryReleaseNotes
+        }
+        
         return nil
     }
 
@@ -429,7 +439,16 @@ class ArchiveItem: CustomStringConvertible {
             return nil
         }
         
-        let format = (path.pathExtension.caseInsensitiveCompare("txt") == .orderedSame) ? "plain-text" : "html"
+        let format: String
+        let pathExtension = path.pathExtension
+        switch pathExtension {
+        case "txt":
+            format = "plain-text"
+        case "md", "markdown":
+            format = "markdown"
+        default:
+            format = "html"
+        }
         
         if embedReleaseNotesAlways {
             return (content, format)
