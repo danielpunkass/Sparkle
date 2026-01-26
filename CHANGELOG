@@ -9,7 +9,7 @@
 * Download temporary files in-memory using NSURLSessionDataTask (#2825) (Zorg)
 * Allow [impatient update check interval](https://sparkle-project.org/documentation/customization/) to be configured for updates that are downloaded automatically (#2799) (Zorg)
 * Add `allowsAutomaticUpdates` property to determine if automatic downloading/installing of updates option should be enabled (#2809) (Zorg)
-* Add Vietnamese translation (#2816) (TranPhuong319)
+* Add Vietnamese translation (#2816, #2839) (TranPhuong319)
 * Add missing nn language to Installer progress Info.plist (#2818) (Zorg)
 * Find non-canonical Sparkle.framework locations in generate_appcast when creating delta updates to determine compatibility (#2833) (Zorg)
 * Make Debug builds of Sparkle use same time interval settings as Release (#2805) (Zorg)
