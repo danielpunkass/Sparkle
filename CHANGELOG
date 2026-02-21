@@ -8,12 +8,16 @@
 * Validate Obj-C class when reading objects from user defaults / Info plists (#2782) (Zorg)
 * Download temporary files in-memory using NSURLSessionDataTask (#2825) (Zorg)
 * Allow [impatient update check interval](https://sparkle-project.org/documentation/customization/) to be configured for updates that are downloaded automatically (#2799) (Zorg)
+* Probe agent & status service as soon as we launch it to reduce timeout issues (#2852) (Zorg)
 * Add `allowsAutomaticUpdates` property to determine if automatic downloading/installing of updates option should be enabled (#2809) (Zorg)
 * Add Vietnamese translation (#2816, #2839) (TranPhuong319)
 * Add missing nn language to Installer progress Info.plist (#2818) (Zorg)
+* Improve German localization (#2847) (Marco Hillger)
 * Find non-canonical Sparkle.framework locations in generate_appcast when creating delta updates to determine compatibility (#2833) (Zorg)
 * Make Debug builds of Sparkle use same time interval settings as Release (#2805) (Zorg)
 * Remove sparkle-cli from the binary distribution (#2826) (Zorg)
+* Make generate_appcast deltas order stable and thread-safe (#2848) (Nathan Manceaux-Panot)
+* Fix Xcode 26.4 beta compiler warnings (#2850) (Zorg)
 
 # 2.8.1
 
