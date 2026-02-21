@@ -227,6 +227,7 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
             // but we still wanted to record the used delta updates for a batch of recent updates
             // This is to support rollback in case the top newly generated update isn't exactly what the user wants
             let generatingDeltas = latestVersionPerBranch.contains(version)
+            let itemDeltasLock = NSLock()
             var numDeltas = 0
             let appBaseName = latestItem.appPath.deletingPathExtension().lastPathComponent
             for item in updates {
@@ -354,6 +355,10 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
                     markDeltaAsIgnored(delta: delta, markerPath: ignoreMarkerPath)
                     continue
                 }
+                
+                itemDeltasLock.lock()
+                latestItem.deltas.append(delta)
+                itemDeltasLock.unlock()
 
                 group.enter()
                 DispatchQueue.global().async {
@@ -378,11 +383,13 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
 #if GENERATE_APPCAST_BUILD_LEGACY_DSA_SUPPORT
                         hasAnyDSASignature = hasAnyDSASignature || (delta.dsaSignature != nil)
 #endif
-                        if hasAnyDSASignature {
-                            latestItem.deltas.append(delta)
-                        } else {
+                        if !hasAnyDSASignature {
                             markDeltaAsIgnored(delta: delta, markerPath: ignoreMarkerPath)
                             print("Delta \(delta.archivePath.path) ignored, because it could not be signed")
+                            
+                            itemDeltasLock.lock()
+                            latestItem.deltas.removeAll { $0 === delta }
+                            itemDeltasLock.unlock()
                         }
                     }
                     group.leave()
