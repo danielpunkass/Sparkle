@@ -48,8 +48,13 @@ OTHER_SWIFT_FLAGS_COMMON = -DSPARKLE_BUILD_LEGACY_DSA_SUPPORT -DGENERATE_APPCAST
 // Minimum supported macOS version
 MACOSX_DEPLOYMENT_TARGET = 10.13
 
-// Supported architectures
+// Archs to use for Sparkle
+// You can change this for example to add arm64e or remove x86_64
 ARCHS = $(ARCHS_STANDARD)
+
+// Archs to use for command line tools (generate_appcast, sign_update, BinaryDelta, etc)
+// arm64e is not supported for these yet
+ARCHS_COMMAND_LINE_TOOLS = $(ARCHS_STANDARD)
 
 // Default Sparkle names
 SPARKLE_BUNDLE_IDENTIFIER = org.sparkle-project.Sparkle
@@ -93,13 +98,13 @@ SPARKLE_ICON_NAME = AppIcon
 // If you change any of these version details, you must increase CURRENT_PROJECT_VERSION
 // These variables must have a space after the '=' too
 SPARKLE_VERSION_MAJOR = 2
-SPARKLE_VERSION_MINOR = 8
+SPARKLE_VERSION_MINOR = 9
 SPARKLE_VERSION_PATCH = 0
 
 // This should be in SemVer format or empty, ie. "-beta.1"
 // These variables must have a space after the '=' too
-SPARKLE_VERSION_SUFFIX = -beta.1
-CURRENT_PROJECT_VERSION = 2046
+SPARKLE_VERSION_SUFFIX =
+CURRENT_PROJECT_VERSION = 2053
 
 MARKETING_VERSION = $(SPARKLE_VERSION_MAJOR).$(SPARKLE_VERSION_MINOR).$(SPARKLE_VERSION_PATCH)$(SPARKLE_VERSION_SUFFIX)
 ALWAYS_SEARCH_USER_PATHS = NO

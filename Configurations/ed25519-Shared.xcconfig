@@ -15,3 +15,6 @@ WARNING_CFLAGS = $(inherited) -Wno-cast-qual -Wno-conversion -Wno-sign-conversio
 
 // Disable dead stores analyzer warning
 CLANG_ANALYZER_DEADCODE_DEADSTORES = NO
+
+// ed25519 is used by command line tools too
+ARCHS = $(inherited) $(ARCHS_COMMAND_LINE_TOOLS)

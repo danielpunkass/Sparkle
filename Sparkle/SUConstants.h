@@ -16,12 +16,6 @@
 //	Misc:
 // -----------------------------------------------------------------------------
 
-extern const NSTimeInterval SUDefaultUpdatePermissionPromptInterval;
-extern const NSTimeInterval SUMinimumUpdateCheckInterval;
-extern const NSTimeInterval SUDefaultUpdateCheckInterval;
-extern const uint64_t SULeewayUpdateCheckInterval;
-extern const NSTimeInterval SUImpatientUpdateCheckInterval;
-
 extern NSString *const SUBundleIdentifier;
 
 extern NSString *const SUAppcastAttributeValueMacOS;
@@ -30,7 +24,6 @@ extern NSString *const SUAppcastAttributeValueMacOS;
 //	Notifications:
 // -----------------------------------------------------------------------------
 
-extern NSString *const SUTechnicalErrorInformationKey;
 extern NSString *const SUUpdateAutomaticCheckSettingChangedNotification;
 extern NSString *const SUUpdateSettingsNeedsSynchronizationNotification;
 extern NSString *const SUUpdateBundlePathUserInfoKey;
@@ -47,10 +40,13 @@ extern NSString *const SUSkippedMinorVersionKey;
 extern NSString *const SUSkippedMajorVersionKey;
 extern NSString *const SUSkippedMajorSubreleaseVersionKey;
 extern NSString *const SUScheduledCheckIntervalKey;
+extern NSString *const SUScheduledImpatientCheckIntervalKey;
 extern NSString *const SULastCheckTimeKey;
+extern NSString *const SUSignedFeedFailureExpirationIntervalKey;
 extern NSString *const SUPublicDSAKeyKey;
 extern NSString *const SUPublicDSAKeyFileKey;
 extern NSString *const SUPublicEDKeyKey;
+extern NSString *const SURequireSignedFeedKey;
 extern NSString *const SUVerifyUpdateBeforeExtractionKey;
 extern NSString *const SUAutomaticallyUpdateKey;
 extern NSString *const SUAllowsAutomaticUpdatesKey;
@@ -67,11 +63,6 @@ extern NSString *const SUPromptUserOnFirstLaunchKey;
 extern NSString *const SUDefaultsDomainKey;
 extern NSString *const SUEnableJavaScriptKey;
 extern NSString *const SUAllowedURLSchemesKey;
-extern NSString *const SUFixedHTMLDisplaySizeKey __attribute__((deprecated("This key is obsolete and has no effect.")));
-extern NSString *const SUAppendVersionNumberKey __attribute__((deprecated("This key is obsolete. See SPARKLE_APPEND_VERSION_NUMBER.")));
-extern NSString *const SUEnableAutomatedDowngradesKey __attribute__((deprecated("This key is obsolete. See SPARKLE_AUTOMATED_DOWNGRADES.")));
-extern NSString *const SUNormalizeInstalledApplicationNameKey __attribute__((deprecated("This key is obsolete. SPARKLE_NORMALIZE_INSTALLED_APPLICATION_NAME.")));
-extern NSString *const SURelaunchToolNameKey __attribute__((deprecated("This key is obsolete. SPARKLE_RELAUNCH_TOOL_NAME.")));
 
 // -----------------------------------------------------------------------------
 //	Appcast keys::
@@ -87,6 +78,7 @@ extern NSString *const SUAppcastAttributeVersion;
 extern NSString *const SUAppcastAttributeOsType;
 extern NSString *const SUAppcastAttributeInstallationType;
 extern NSString *const SUAppcastAttributeFormat;
+extern NSString *const SUAppcastAttributeLength;
 
 extern NSString *const SUAppcastElementVersion;
 extern NSString *const SUAppcastElementShortVersionString;
@@ -95,6 +87,9 @@ extern NSString *const SUAppcastElementDeltas;
 extern NSString *const SUAppcastElementMinimumAutoupdateVersion;
 extern NSString *const SUAppcastElementMinimumSystemVersion;
 extern NSString *const SUAppcastElementMaximumSystemVersion;
+extern NSString *const SUAppcastElementMinimumUpdateVersion;
+extern NSString *const SUAppcastElementHardwareRequirements;
+extern NSString *const SUAppcastElementHardwareRequirementARM64;
 extern NSString *const SUAppcastElementReleaseNotesLink;
 extern NSString *const SUAppcastElementFullReleaseNotesLink;
 extern NSString *const SUAppcastElementTags;

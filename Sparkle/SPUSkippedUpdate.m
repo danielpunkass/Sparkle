@@ -35,9 +35,9 @@
 
 + (nullable SPUSkippedUpdate *)skippedUpdateForHost:(SUHost *)host
 {
-    NSString *minorVersion = [host objectForUserDefaultsKey:SUSkippedMinorVersionKey];
-    NSString *majorVersion = [host objectForUserDefaultsKey:SUSkippedMajorVersionKey];
-    NSString *majorSubreleaseVersion = [host objectForUserDefaultsKey:SUSkippedMajorSubreleaseVersionKey];
+    NSString *minorVersion = [host objectForUserDefaultsKey:SUSkippedMinorVersionKey ofClass:NSString.class];
+    NSString *majorVersion = [host objectForUserDefaultsKey:SUSkippedMajorVersionKey ofClass:NSString.class];
+    NSString *majorSubreleaseVersion = [host objectForUserDefaultsKey:SUSkippedMajorSubreleaseVersionKey ofClass:NSString.class];
     
     if (minorVersion != nil || majorVersion != nil) {
         return [[SPUSkippedUpdate alloc] initWithMinorVersion:minorVersion majorVersion:majorVersion majorSubreleaseVersion:majorSubreleaseVersion];

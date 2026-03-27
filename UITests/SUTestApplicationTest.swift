@@ -52,6 +52,9 @@ class SUTestApplicationTest: XCTestCase
         let checkForUpdatesMenuItem = menuBarsQuery.menuItems["Check for Updates…"]
         if checkForUpdatesMenuItem.isEnabled {
             checkForUpdatesMenuItem.click()
+            
+            // Give some time to wait for window to show up
+            sleep(5)
         } else {
             // We haven't checked for updates in a while so an automatic check was already done
             // in this case click the main menu again to deactivate it
@@ -105,7 +108,7 @@ class SUTestApplicationTest: XCTestCase
     }
     
     func test2DeltaUpdate() {
-        runTestApplication(testMode: "DELTA", automatic: false, expectedFinalVersion: "2.1", launchSleep: 75, extractSleep: 45)
+        runTestApplication(testMode: "DELTA_AND_MARKDOWN", automatic: false, expectedFinalVersion: "2.1", launchSleep: 75, extractSleep: 45)
     }
     
     func test3AutomaticUpdate() {

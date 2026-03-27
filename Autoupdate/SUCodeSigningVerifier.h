@@ -19,6 +19,14 @@ NS_ASSUME_NONNULL_BEGIN
 #define SUCodeSigningVerifierDefinitionAttribute __attribute__((objc_runtime_name("SUTestCodeSigningVerifier")))
 #endif
 
+typedef NS_ENUM(NSUInteger, SUValidateConnectionStatus) {
+    SUValidateConnectionStatusSetCodeSigningRequirementSuccess = 0,
+    SUValidateConnectionStatusSetNoRequirementSuccess,
+    SUValidateConnectionStatusAPIFailure,
+    SUValidateConnectionStatusCodeSigningRequirementFailure,
+    SUValidateConectionNoSupportedValidationMethodFailure,
+};
+
 SUCodeSigningVerifierDefinitionAttribute
 @interface SUCodeSigningVerifier : NSObject
 
@@ -34,6 +42,9 @@ SUCodeSigningVerifierDefinitionAttribute
 + (BOOL)bundleAtURLIsCodeSigned:(NSURL *)bundleURL;
 
 + (NSString * _Nullable)teamIdentifierAtURL:(NSURL *)url;
++ (NSString * _Nullable)teamIdentifierFromMainExecutable;
+
++ (SUValidateConnectionStatus)validateConnection:(NSXPCConnection *)connection error:(NSError * __autoreleasing *)error;
 
 @end
 

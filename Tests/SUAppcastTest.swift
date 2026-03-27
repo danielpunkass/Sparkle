@@ -20,7 +20,7 @@ class SUAppcastTest: XCTestCase {
             let hostVersion = "1.0"
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
             
-            let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+            let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
             let items = appcast.items
 
             XCTAssertEqual(4, items.count)
@@ -53,7 +53,7 @@ class SUAppcastTest: XCTestCase {
 
             // Test best appcast item & a delta update item
             let currentDate = Date()
-            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
             
             let supportedAppcastItems = supportedAppcast.items
             
@@ -91,7 +91,7 @@ class SUAppcastTest: XCTestCase {
             let hostVersion = "1.0"
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
             
-            let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+            let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
             XCTAssertEqual(6, appcast.items.count)
             
             do {
@@ -139,6 +139,33 @@ class SUAppcastTest: XCTestCase {
         }
     }
     
+    func testMinimumUpdateVersion() {
+        let testURL = Bundle(for: SUAppcastTest.self).url(forResource: "testappcast_minimumUpdateVersion", withExtension: "xml")!
+        
+        do {
+            let testData = try Data(contentsOf: testURL)
+            
+            let versionComparator = SUStandardVersionComparator.default
+            let hostVersion = "1.0"
+            let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
+            
+            let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
+            XCTAssertEqual(4, appcast.items.count)
+            
+            do {
+                let filteredAppcast = SUAppcastDriver.filterAppcast(appcast, forMacOSAndAllowedChannels: [])
+                XCTAssertEqual(3, filteredAppcast.items.count)
+                
+                XCTAssertEqual("2.0", filteredAppcast.items[0].versionString)
+                XCTAssertEqual("3.0", filteredAppcast.items[1].versionString)
+                XCTAssertEqual("4.0", filteredAppcast.items[2].versionString)
+            }
+        } catch let err as NSError {
+            NSLog("%@", err)
+            XCTFail(err.localizedDescription)
+        }
+    }
+    
     func testCriticalUpdateVersion() {
         let testURL = Bundle(for: SUAppcastTest.self).url(forResource: "testappcast", withExtension: "xml")!
         
@@ -152,7 +179,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 XCTAssertTrue(appcast.items[0].isCriticalUpdate)
             }
             
@@ -161,7 +188,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.5"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 XCTAssertFalse(appcast.items[0].isCriticalUpdate)
             }
             
@@ -170,7 +197,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.6"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 XCTAssertFalse(appcast.items[0].isCriticalUpdate)
             }
         } catch let err as NSError {
@@ -192,7 +219,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertFalse(appcast.items[0].isInformationOnlyUpdate)
                 XCTAssertFalse(appcast.items[1].isInformationOnlyUpdate)
@@ -211,7 +238,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.3"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertFalse(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -221,7 +248,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.4"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertTrue(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -231,7 +258,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.5"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertTrue(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -241,7 +268,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.6"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertFalse(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -251,7 +278,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "0.5"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertFalse(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -261,7 +288,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "0.4"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertTrue(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -271,7 +298,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "0.0"
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
                 
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertTrue(appcast.items[1].isInformationOnlyUpdate)
             }
@@ -296,7 +323,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertEqual(2, appcast.items.count)
             }
@@ -307,9 +334,9 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                 XCTAssertEqual(1, supportedAppcast.items.count)
                 
@@ -323,9 +350,9 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                 XCTAssertEqual(2, supportedAppcast.items.count)
                 
@@ -339,9 +366,9 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "2.5"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                 XCTAssertEqual(2, supportedAppcast.items.count)
                 
@@ -355,13 +382,13 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 // There should be no items if 2.0 is skipped from 1.0 and 3.0 fails minimum autoupdate version
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "2.0", majorVersion: nil, majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                     XCTAssertEqual(0, supportedAppcast.items.count)
                 }
@@ -370,7 +397,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "2.0", majorVersion: nil, majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -383,7 +410,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -396,7 +423,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "2.0", majorVersion: "3.0", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(0, supportedAppcast.items.count)
                 }
@@ -406,7 +433,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "2.5", majorVersion: nil, majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -419,7 +446,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "1.5", majorVersion: nil, majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -432,7 +459,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "1.5", majorVersion: nil, majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(2, supportedAppcast.items.count)
                     
@@ -445,7 +472,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "1.5", majorVersion: "1.0", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -458,7 +485,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "1.5", majorVersion: "1.0", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(2, supportedAppcast.items.count)
                     
@@ -487,7 +514,7 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 XCTAssertEqual(5, appcast.items.count)
             }
@@ -498,9 +525,9 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                 
                 XCTAssertEqual(1, supportedAppcast.items.count)
                 
@@ -515,11 +542,11 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: nil)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
             
                 XCTAssertEqual(3, supportedAppcast.items.count)
                 
@@ -534,11 +561,11 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: nil)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
             
                 XCTAssertEqual(1, supportedAppcast.items.count)
                 
@@ -553,11 +580,11 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "4.0", majorSubreleaseVersion: nil)
                 
-                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
             
                 XCTAssertEqual(1, supportedAppcast.items.count)
                 
@@ -585,14 +612,14 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 // Allow minimum autoupdate version to fail and only skip major version "3.0" with no subrelease version
                 // This should skip all 3.x versions except for 3.9 which ignores skipped upgrades below 3.5, but not 4.x versions nor 2.x versions
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(4, supportedAppcast.items.count)
                     
@@ -611,7 +638,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.4", majorSubreleaseVersion: nil)
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(4, supportedAppcast.items.count)
                     
@@ -630,7 +657,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: "3.5")
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(3, supportedAppcast.items.count)
                     
@@ -648,7 +675,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "3.0", majorSubreleaseVersion: "3.5.1")
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(3, supportedAppcast.items.count)
                     
@@ -666,7 +693,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: nil, majorVersion: "4.0", majorSubreleaseVersion: "4.0")
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     
@@ -682,7 +709,7 @@ class SUAppcastTest: XCTestCase {
                 do {
                     let skippedUpdate = SPUSkippedUpdate(minorVersion: "2.1", majorVersion: "4.0", majorSubreleaseVersion: "4.0")
                     
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: false)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: skippedUpdate, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
                 
                     XCTAssertEqual(0, supportedAppcast.items.count)
                 }
@@ -690,6 +717,57 @@ class SUAppcastTest: XCTestCase {
         } catch let err as NSError {
             NSLog("%@", err)
             XCTFail(err.localizedDescription)
+        }
+    }
+    
+    func testARM64Requirement() throws {
+        let testURL = Bundle(for: SUAppcastTest.self).url(forResource: "testappcast_arm64HardwareRequirement", withExtension: "xml")!
+        
+        do {
+            let testData = try Data(contentsOf: testURL)
+            
+            let versionComparator = SUStandardVersionComparator()
+            
+            do {
+                // Test appcast without a filter
+                
+                let hostVersion = "1.0"
+                
+                let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
+                
+                XCTAssertEqual(6, appcast.items.count)
+            }
+            
+            let currentDate = Date()
+            do {
+                let hostVersion = "1.0"
+                
+                let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
+                
+                let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: nil, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: false)
+                
+            #if arch(x86_64)
+                // We're assuming this test is not run through Rosetta
+                XCTAssertEqual(2, supportedAppcast.items.count)
+                
+                let bestAppcastItem = SUAppcastDriver.bestItem(fromAppcastItems: supportedAppcast.items, getDeltaItem: nil, withHostVersion: hostVersion, comparator: versionComparator)
+                XCTAssertEqual(bestAppcastItem.versionString, "2.1")
+            #else
+                if #available(macOS 27, *) {
+                    XCTAssertEqual(6, supportedAppcast.items.count)
+                    
+                    let bestAppcastItem = SUAppcastDriver.bestItem(fromAppcastItems: supportedAppcast.items, getDeltaItem: nil, withHostVersion: hostVersion, comparator: versionComparator)
+                    XCTAssertEqual(bestAppcastItem.versionString, "6.0")
+                } else {
+                    XCTAssertEqual(5, supportedAppcast.items.count)
+                    
+                    let bestAppcastItem = SUAppcastDriver.bestItem(fromAppcastItems: supportedAppcast.items, getDeltaItem: nil, withHostVersion: hostVersion, comparator: versionComparator)
+                    XCTAssertEqual(bestAppcastItem.versionString, "5.0")
+                }
+            #endif
+            }
         }
     }
     
@@ -710,13 +788,13 @@ class SUAppcastTest: XCTestCase {
                 let hostVersion = "1.0"
                 
                 let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                 
                 do {
                     // Test no group
                     let group: NSNumber? = nil
                     let currentDate = Date()
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                     
                     XCTAssertEqual(1, supportedAppcast.items.count)
                     XCTAssertEqual("2.0", supportedAppcast.items[0].versionString)
@@ -726,7 +804,7 @@ class SUAppcastTest: XCTestCase {
                     // Test 0 group with current date (way ahead of pubDate)
                     let group: NSNumber? = nil
                     let currentDate = Date()
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                     
                     XCTAssertEqual(1, supportedAppcast.items.count)
                 }
@@ -735,7 +813,7 @@ class SUAppcastTest: XCTestCase {
                     // Test 6th group with current date (way ahead of pubDate)
                     let group = 6 as NSNumber
                     let currentDate = Date()
-                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                    let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                     
                     XCTAssertEqual(1, supportedAppcast.items.count)
                 }
@@ -748,7 +826,7 @@ class SUAppcastTest: XCTestCase {
                         // No update should be found
                         let group = 0 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(0, supportedAppcast.items.count)
                     }
@@ -758,7 +836,7 @@ class SUAppcastTest: XCTestCase {
                         // No update should be found still
                         let group = 6 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(0, supportedAppcast.items.count)
                     }
@@ -771,7 +849,7 @@ class SUAppcastTest: XCTestCase {
                         // Test group 0 with current date 2 days after rollout
                         let group = 0 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(1, supportedAppcast.items.count)
                     }
@@ -780,7 +858,7 @@ class SUAppcastTest: XCTestCase {
                         // Test group 1 with current date 3 days after rollout
                         let group = 1 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(1, supportedAppcast.items.count)
                     }
@@ -789,7 +867,7 @@ class SUAppcastTest: XCTestCase {
                         // Test group 2 with current date 3 days after rollout
                         let group = 2 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(1, supportedAppcast.items.count)
                     }
@@ -798,7 +876,7 @@ class SUAppcastTest: XCTestCase {
                         // Test group 3 with current date 3 days after rollout
                         let group = 3 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(0, supportedAppcast.items.count)
                     }
@@ -807,7 +885,7 @@ class SUAppcastTest: XCTestCase {
                         // Test group 6 with current date 3 days after rollout
                         let group = 6 as NSNumber
                         
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(0, supportedAppcast.items.count)
                     }
@@ -818,13 +896,13 @@ class SUAppcastTest: XCTestCase {
                     let hostVersion = "2.0"
                     
                     let stateResolver = SPUAppcastItemStateResolver(hostVersion: hostVersion, applicationVersionComparator: versionComparator, standardVersionComparator: versionComparator)
-                    let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver)
+                    let appcast = try SUAppcast(xmlData: testData, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
                     
                     do {
                         // Test no group
                         let group: NSNumber? = nil
                         let currentDate = Date()
-                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                        let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                         
                         XCTAssertEqual(2, supportedAppcast.items.count)
                         XCTAssertEqual("3.0", supportedAppcast.items[0].versionString)
@@ -837,7 +915,7 @@ class SUAppcastTest: XCTestCase {
                             // Test group 0 with current date 3 days before rollout
                             let group = 0 as NSNumber
                             
-                            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                             
                             XCTAssertEqual(1, supportedAppcast.items.count)
                             XCTAssertEqual("3.0", supportedAppcast.items[0].versionString)
@@ -851,7 +929,7 @@ class SUAppcastTest: XCTestCase {
                             // Test group 6 with current date 3 days after rollout
                             let group = 6 as NSNumber
                             
-                            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testOSVersion: true, testMinimumAutoupdateVersion: true)
+                            let supportedAppcast = SUAppcastDriver.filterSupportedAppcast(appcast, phasedUpdateGroup: group, skippedUpdate: nil, currentDate: currentDate, hostVersion: hostVersion, versionComparator: versionComparator, testMinimumSystemRequirements: true, testMinimumAutoupdateVersion: true)
                             
                             XCTAssertEqual(1, supportedAppcast.items.count)
                             XCTAssertEqual("3.0", supportedAppcast.items[0].versionString)
@@ -882,7 +960,7 @@ class SUAppcastTest: XCTestCase {
             
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
             
-            let fullAppcast = try SUAppcast(xmlData: testFileData, relativeTo: testFileUrl, stateResolver: stateResolver)
+            let fullAppcast = try SUAppcast(xmlData: testFileData, relativeTo: testFileUrl, stateResolver: stateResolver, signingValidationStatus: .skipped)
             
             do {
                 let appcast = SUAppcastDriver.filterAppcast(fullAppcast, forMacOSAndAllowedChannels: ["english-later"])
@@ -928,7 +1006,7 @@ class SUAppcastTest: XCTestCase {
         do {
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
             
-            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: nil, stateResolver: stateResolver)
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
             let items = appcast.items
 
             XCTAssertEqual(2, items.count)
@@ -952,7 +1030,7 @@ class SUAppcastTest: XCTestCase {
             
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
             
-            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver)
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver, signingValidationStatus: .skipped)
             let items = appcast.items
             
             XCTAssertEqual(3, items.count)
@@ -990,7 +1068,7 @@ class SUAppcastTest: XCTestCase {
             
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
             
-            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver)
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver, signingValidationStatus: .skipped)
             let items = appcast.items
 
             XCTAssertEqual(4, items.count)
@@ -1025,12 +1103,64 @@ class SUAppcastTest: XCTestCase {
             
             let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
             
-            let _ = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver)
+            let _ = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver, signingValidationStatus: .skipped)
             
             XCTFail("Appcast creation should fail when encountering dangerous link")
         } catch let err as NSError {
             NSLog("Expected error: %@", err)
             XCTAssertNotNil(err)
+        }
+    }
+    
+    func testDangerousLinkWithSucceededSigningValidation() {
+        let testFile = Bundle(for: SUAppcastTest.self).path(forResource: "test-dangerous-link", ofType: "xml")!
+        let testData = NSData(contentsOfFile: testFile)!
+        
+        do {
+            let baseURL: URL? = nil
+            
+            let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
+            
+            let _ = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver, signingValidationStatus: .skipped)
+            
+            XCTFail("Appcast creation should fail when encountering dangerous link")
+        } catch let err as NSError {
+            NSLog("Expected error: %@", err)
+            XCTAssertNotNil(err)
+        }
+    }
+    
+    func testDangerousLinkWithFailedSigningValidation() {
+        let testFile = Bundle(for: SUAppcastTest.self).path(forResource: "test-dangerous-link", ofType: "xml")!
+        let testData = NSData(contentsOfFile: testFile)!
+        
+        do {
+            let baseURL: URL? = nil
+            
+            let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
+            
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: baseURL, stateResolver: stateResolver, signingValidationStatus: .failed)
+            
+            // Links and info only and critical updates should be stripped/removed appropriately
+            
+            XCTAssertEqual(appcast.items.count, 2)
+            XCTAssertEqual(appcast.signingValidationStatus, .failed)
+            
+            for (appcastItemIndex, appcastItem) in appcast.items.enumerated() {
+                XCTAssertNil(appcastItem.infoURL)
+                XCTAssertNil(appcastItem.releaseNotesURL)
+                XCTAssertNil(appcastItem.fullReleaseNotesURL)
+                XCTAssertFalse(appcastItem.isCriticalUpdate)
+                
+                if appcastItemIndex == 0 {
+                    XCTAssertEqual(appcastItem.versionString, "3.0 (Visit abc.")
+                } else if appcastItemIndex == 1 {
+                    XCTAssertEqual(appcastItem.displayVersionString, "2.0 (Visit abc.")
+                }
+            }
+        } catch let err as NSError {
+            NSLog("Expected error: %@", err)
+            XCTFail("Appcast creation should have passed when encountering dangerous link of one item")
         }
     }
 }

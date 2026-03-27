@@ -1,8 +1,8 @@
-# Sparkle 2 ![Build Status](https://github.com/sparkle-project/Sparkle/workflows/Build%20%26%20Tests/badge.svg?branch=2.x) ![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-4BC51D.svg?style=flat) [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage) [![CocoaPods](https://img.shields.io/cocoapods/v/Sparkle.svg?cacheSeconds=86400)](https://cocoapods.org/pods/Sparkle)
+# Sparkle 2 [![Build Status](https://github.com/sparkle-project/Sparkle/actions/workflows/ci.yml/badge.svg?branch=2.x)](https://github.com/sparkle-project/Sparkle/actions/workflows/ci.yml) ![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-4BC51D.svg?style=flat) [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage) [![CocoaPods](https://img.shields.io/cocoapods/v/Sparkle.svg?cacheSeconds=86400)](https://cocoapods.org/pods/Sparkle)
 
 Secure and reliable software update framework for macOS.
 
-<img src="Resources/Screenshot.png" width="732" alt="Sparkle shows familiar update window with release notes">
+<img src="Resources/Screenshot2.png" width="732" alt="Sparkle shows familiar update window with release notes">
 
 # About this Particular Fork
 

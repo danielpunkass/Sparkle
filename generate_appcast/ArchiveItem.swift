@@ -7,9 +7,11 @@ import Foundation
 import UniformTypeIdentifiers
 
 struct UpdateBranch: Hashable {
+    let minimumUpdateVersion: String?
     let minimumSystemVersion: String?
     let maximumSystemVersion: String?
     let minimumAutoupdateVersion: String?
+    let hardwareRequirements: String?
     let channel: String?
 }
 
@@ -66,6 +68,7 @@ class ArchiveItem: CustomStringConvertible {
     // swiftlint:disable identifier_name
     let _shortVersion: String?
     let minimumSystemVersion: String
+    let hardwareRequirements: String?
     let frameworkVersion: String?
     let sparkleExecutableFileSize: Int?
     let sparkleLocales: String?
@@ -74,6 +77,7 @@ class ArchiveItem: CustomStringConvertible {
     let feedURL: URL?
     let publicEdKey: Data?
     let supportsDSA: Bool
+    let requiresSignedAppcast: Bool
     let archiveFileAttributes: [FileAttributeKey: Any]
     var deltas: [DeltaUpdate]
 
@@ -84,12 +88,100 @@ class ArchiveItem: CustomStringConvertible {
     var downloadUrlPrefix: URL?
     var releaseNotesURLPrefix: URL?
     var signingError: Error?
+    
+    @available(macOS 10.15.4, *)
+    private static func binaryContainsPreARMSlice(_ fileURL: URL) -> Bool? {
+        guard let fileHandle = try? FileHandle(forReadingFrom: fileURL) else {
+            return nil
+        }
+        
+        defer {
+            try? fileHandle.close()
+        }
+        
+        // First, read just enough bytes to determine the magic number (4 bytes)
+        let MAGIC_SIZE = 4
+        guard let magicData = try? fileHandle.read(upToCount: MAGIC_SIZE),
+              magicData.count == MAGIC_SIZE else {
+            return nil
+        }
+        
+        let preARMSlices: [cpu_type_t] = [CPU_TYPE_X86_64, CPU_TYPE_I386, CPU_TYPE_POWERPC, CPU_TYPE_POWERPC64]
+        
+        // Read magic number
+        let magic = magicData.withUnsafeBytes { $0.load(as: UInt32.self) }
+        
+        // Check if this is a fat binary
+        if magic == FAT_CIGAM || magic == FAT_CIGAM_64 {
+            // For fat binaries, we need to read the rest of the fat_header to get the number of architectures
+            guard let remainingHeaderData = try? fileHandle.read(upToCount: MemoryLayout<fat_header>.size - MAGIC_SIZE),
+                  remainingHeaderData.count == MemoryLayout<fat_header>.size - MAGIC_SIZE else {
+                return nil
+            }
+            
+            // Read number of architectures
+            let nfat_arch = remainingHeaderData.withUnsafeBytes {
+                let value = $0.load(fromByteOffset: 0, as: UInt32.self)
+                return value.bigEndian
+            }
+            
+            let is64BitMagic = (magic == FAT_CIGAM_64)
+            
+            let fatArchSize = is64BitMagic ? MemoryLayout<fat_arch_64>.size : MemoryLayout<fat_arch>.size
+            
+            // Read each architecture header
+            for i in 0..<Int(nfat_arch) {
+                let offset = MemoryLayout<fat_header>.size + (i * fatArchSize)
+                
+                // We need to seek from the beginning of the file
+                guard let _ = try? fileHandle.seek(toOffset: UInt64(offset)),
+                      let archHeaderData = try? fileHandle.read(upToCount: fatArchSize),
+                      archHeaderData.count >= fatArchSize else {
+                    continue
+                }
+                
+                let cputype = archHeaderData.withUnsafeBytes {
+                    let value = $0.load(as: Int32.self)
+                    return Int32(bigEndian: value)
+                }
+                
+                if preARMSlices.contains(cputype) {
+                    return true
+                }
+            }
+            
+            return false
+        } else if magic == MH_MAGIC || magic == MH_MAGIC_64 || magic == MH_CIGAM || magic == MH_CIGAM_64 {
+            // For Mach-O binaries, we need to read the rest of the mach_header to get CPU type
+            let is64BitMagic = (magic == MH_MAGIC_64 || magic == MH_CIGAM_64)
+            let machHeaderSize = is64BitMagic ? MemoryLayout<mach_header_64>.size : MemoryLayout<mach_header>.size
+            
+            // Read the rest of the header
+            guard let remainingHeaderData = try? fileHandle.read(upToCount: machHeaderSize - MAGIC_SIZE),
+                  remainingHeaderData.count == machHeaderSize - MAGIC_SIZE else {
+                return nil
+            }
+            
+            let reversedEndian = (magic == MH_CIGAM || magic == MH_CIGAM_64)
+            
+            let cputype = remainingHeaderData.withUnsafeBytes {
+                let value = $0.load(fromByteOffset: 0, as: Int32.self)
+                return reversedEndian ? Int32(bigEndian: value) : Int32(littleEndian: value)
+            }
+            
+            return preARMSlices.contains(cputype)
+        } else {
+            return nil
+        }
+    }
 
-    init(version: String, shortVersion: String?, feedURL: URL?, minimumSystemVersion: String?, frameworkVersion: String?, sparkleExecutableFileSize: Int?, sparkleLocales: String?, publicEdKey: String?, supportsDSA: Bool, appPath: URL, archivePath: URL) throws {
+    init(version: String, shortVersion: String?, feedURL: URL?, requiresSignedAppcast: Bool, minimumSystemVersion: String?, hardwareRequirements: String?, frameworkVersion: String?, sparkleExecutableFileSize: Int?, sparkleLocales: String?, publicEdKey: String?, supportsDSA: Bool, appPath: URL, archivePath: URL) throws {
         self.version = version
         self._shortVersion = shortVersion
         self.feedURL = feedURL
+        self.requiresSignedAppcast = requiresSignedAppcast
         self.minimumSystemVersion = minimumSystemVersion ?? "10.13"
+        self.hardwareRequirements = hardwareRequirements
         self.frameworkVersion = frameworkVersion
         self.sparkleExecutableFileSize = sparkleExecutableFileSize
         self.sparkleLocales = sparkleLocales
@@ -161,27 +253,70 @@ class ArchiveItem: CustomStringConvertible {
                 }
             }
             
+            let requiresSignedAppcast: Bool
+            if let requiresSignedAppcastValue = infoPlist[SURequireSignedFeedKey] as? Bool {
+                requiresSignedAppcast = requiresSignedAppcastValue
+            } else {
+                requiresSignedAppcast = false
+            }
+            
+            // Intel Macs shouldn't be supported on macOS 27+ and
+            // we don't have any other hardware requirements except for arm64 right now
+            var mayNeedHardwareRequirement = true
+            let minimumSystemVersion = infoPlist["LSMinimumSystemVersion"] as? String
+            if let minimumSystemVersion {
+                let versionComparator = SUStandardVersionComparator()
+                if versionComparator.compareVersion(minimumSystemVersion, toVersion: "27.0") != .orderedAscending {
+                    mayNeedHardwareRequirement = false
+                }
+            }
+            
+            var hardwareRequirements: String? = nil
+            if mayNeedHardwareRequirement {
+                if #available(macOS 10.15.4, *) {
+                    if let executableName = infoPlist[kCFBundleExecutableKey as String] as? String {
+                        let executablePath = appPath.appendingPathComponent("Contents/MacOS/\(executableName)")
+                        if let containsPreARMSlice = Self.binaryContainsPreARMSlice(executablePath), !containsPreARMSlice {
+                            hardwareRequirements = SUAppcastElementHardwareRequirementARM64
+                        }
+                    }
+                }
+            }
+            
             var frameworkVersion: String? = nil
             let sparkleExecutableFileSize: Int?
             let sparkleLocales: String?
             do {
-                let canonicalFrameworksURL = appPath.appendingPathComponent("Contents/Frameworks/Sparkle.framework")
+                let fileManager = FileManager.default
                 
                 let frameworksURL: URL?
-                let usingLegacySparkleCore: Bool
-                if !FileManager.default.fileExists(atPath: canonicalFrameworksURL.path) {
-                    // Try legacy SparkleCore framework that was shipping in early 2.0 betas
-                    let sparkleCoreFrameworksURL = appPath.appendingPathComponent("Contents/Frameworks/SparkleCore.framework")
-                    if FileManager.default.fileExists(atPath: sparkleCoreFrameworksURL.path) {
-                        frameworksURL = sparkleCoreFrameworksURL
-                        usingLegacySparkleCore = true
+                let canonicalFrameworksURL = appPath.appendingPathComponent("Contents/Frameworks/Sparkle.framework")
+                if fileManager.fileExists(atPath: canonicalFrameworksURL.path) {
+                    frameworksURL = canonicalFrameworksURL
+                } else {
+                    // The framework may be inside another framework or plug-in. Find it.
+                    if let enumerator = fileManager.enumerator(at: appPath, includingPropertiesForKeys: [], options: [.skipsHiddenFiles], errorHandler: nil) {
+                        var foundFrameworksURL: URL?
+                        
+                        for case let fileURL as URL in enumerator {
+                            let name = fileURL.lastPathComponent
+                            
+                            // Skip Resources in bundles entirely because frameworks shouldn't be in there and we don't want to pay the cost of scanning in there
+                            guard name != "Resources" else {
+                                enumerator.skipDescendants()
+                                continue
+                            }
+                            
+                            if name == "Sparkle.framework" {
+                                foundFrameworksURL = fileURL
+                                break
+                            }
+                        }
+                        
+                        frameworksURL = foundFrameworksURL
                     } else {
                         frameworksURL = nil
-                        usingLegacySparkleCore = false
                     }
-                } else {
-                    frameworksURL = canonicalFrameworksURL
-                    usingLegacySparkleCore = false
                 }
                 
                 if let frameworksURL = frameworksURL {
@@ -191,7 +326,7 @@ class ArchiveItem: CustomStringConvertible {
                         frameworkVersion = frameworkInfoPlist[kCFBundleVersionKey as String] as? String
                     }
                     
-                    let frameworkExecutableURL = frameworksURL.appendingPathComponent(!usingLegacySparkleCore ? "Sparkle" : "SparkleCore").resolvingSymlinksInPath()
+                    let frameworkExecutableURL = frameworksURL.appendingPathComponent("Sparkle").resolvingSymlinksInPath()
                     do {
                         let resourceValues = try frameworkExecutableURL.resourceValues(forKeys: [.fileSizeKey])
                         
@@ -201,7 +336,6 @@ class ArchiveItem: CustomStringConvertible {
                     }
                     
                     do {
-                        let fileManager = FileManager.default
                         let resourcesDirectoryContents = try fileManager.contentsOfDirectory(atPath: resourcesURL.path)
                         let localeExtension = ".lproj"
                         let localeExtensionCount = localeExtension.count
@@ -245,7 +379,9 @@ class ArchiveItem: CustomStringConvertible {
             try self.init(version: version,
                           shortVersion: shortVersion,
                           feedURL: feedURL,
-                          minimumSystemVersion: infoPlist["LSMinimumSystemVersion"] as? String,
+                          requiresSignedAppcast: requiresSignedAppcast,
+                          minimumSystemVersion: minimumSystemVersion,
+                          hardwareRequirements: hardwareRequirements,
                           frameworkVersion: frameworkVersion,
                           sparkleExecutableFileSize: sparkleExecutableFileSize,
                           sparkleLocales: sparkleLocales,
@@ -291,7 +427,7 @@ class ArchiveItem: CustomStringConvertible {
         return (self.archiveFileAttributes[.size] as! NSNumber).int64Value
     }
 
-    private var releaseNotesPath: URL? {
+    var releaseNotesPath: URL? {
         var basename = self.archivePath.deletingPathExtension()
         if basename.pathExtension == "tar" { // tar.gz
             basename = basename.deletingPathExtension()
@@ -307,21 +443,49 @@ class ArchiveItem: CustomStringConvertible {
             return plainTextReleaseNotes
         }
         
+        let markdownReleaseNotes = basename.appendingPathExtension("md")
+        if FileManager.default.fileExists(atPath: markdownReleaseNotes.path) {
+            return markdownReleaseNotes
+        }
+        
+        let markdownSecondaryReleaseNotes = basename.appendingPathExtension("markdown")
+        if FileManager.default.fileExists(atPath: markdownSecondaryReleaseNotes.path) {
+            return markdownSecondaryReleaseNotes
+        }
+        
         return nil
     }
 
     private func getReleaseNotesAsFragment(_ path: URL, _ embedReleaseNotesAlways: Bool) -> (content: String, format: String)?  {
-        guard let content = try? String(contentsOf: path) else {
+        guard let data = try? Data(contentsOf: path) else {
             return nil
         }
         
-        let format = (path.pathExtension.caseInsensitiveCompare("txt") == .orderedSame) ? "plain-text" : "html"
+        let contentData: Data
+        let format: String
+        let pathExtension = path.pathExtension
+        switch pathExtension {
+        case "txt", "TXT":
+            format = "plain-text"
+            contentData = data
+        case "md", "MD", "markdown", "MARKDOWN":
+            format = "markdown"
+            contentData = SPUExtractReleaseNotesContent(data)
+        default:
+            format = "html"
+            contentData = SPUExtractReleaseNotesContent(data)
+        }
         
         if embedReleaseNotesAlways {
-            return (content, format)
-        } else if path.pathExtension.caseInsensitiveCompare("html") == .orderedSame && !content.localizedCaseInsensitiveContains("<!DOCTYPE") && !content.localizedCaseInsensitiveContains("<body")  {
+            guard let contentString = String(data: contentData, encoding: .utf8) else {
+                print("Error: failed to read release notes as UTF8 string: \(path.lastPathComponent)")
+                return nil
+            }
+            
+            return (contentString, format)
+        } else if format == "html", let contentString = String(data: contentData, encoding: .utf8), !contentString.localizedCaseInsensitiveContains("<!DOCTYPE") && !contentString.localizedCaseInsensitiveContains("<body")  {
             // HTML fragments should always be embedded
-            return (content, format)
+            return (contentString, format)
         } else {
             return nil
         }
@@ -334,15 +498,12 @@ class ArchiveItem: CustomStringConvertible {
         return nil
     }
     
-    func releaseNotesURL(embedReleaseNotesAlways: Bool) -> URL? {
-        guard let path = self.releaseNotesPath else {
-            return nil
-        }
+    func releaseNotesURL(releaseNotesPath: URL, embedReleaseNotesAlways: Bool) -> URL? {
         // The file is already used as inline description
-        if self.getReleaseNotesAsFragment(path, embedReleaseNotesAlways) != nil {
+        if self.getReleaseNotesAsFragment(releaseNotesPath, embedReleaseNotesAlways) != nil {
             return nil
         }
-        return self.releaseNoteURL(for: path.lastPathComponent)
+        return self.releaseNoteURL(for: releaseNotesPath.lastPathComponent)
     }
     
     func releaseNoteURL(for unescapedFilename: String) -> URL? {
@@ -359,18 +520,20 @@ class ArchiveItem: CustomStringConvertible {
         }
     }
 
-    func localizedReleaseNotes() -> [(String, URL)] {
+    func localizedReleaseNotes() -> [(String, URL, URL)] {
         var basename = archivePath.deletingPathExtension()
         if basename.pathExtension == "tar" {
             basename = basename.deletingPathExtension()
         }
-        var localizedReleaseNotes = [(String, URL)]()
+        var localizedReleaseNotes = [(String, URL, URL)]()
         for languageCode in Locale.isoLanguageCodes {
             let baseLocalizedReleaseNoteURL = basename
                 .appendingPathExtension(languageCode)
             
             let htmlLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("html")
             let plainTextLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("txt")
+            let markdownLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("md")
+            let markdownSecondaryLocalizedReleaseNoteURL = baseLocalizedReleaseNoteURL.appendingPathExtension("markdown")
             
             let localizedReleaseNoteURL: URL?
             
@@ -378,6 +541,10 @@ class ArchiveItem: CustomStringConvertible {
                 localizedReleaseNoteURL = htmlLocalizedReleaseNoteURL
             } else if (try? plainTextLocalizedReleaseNoteURL.checkResourceIsReachable()) ?? false {
                 localizedReleaseNoteURL = plainTextLocalizedReleaseNoteURL
+            } else if (try? markdownLocalizedReleaseNoteURL.checkResourceIsReachable()) ?? false {
+                localizedReleaseNoteURL = markdownLocalizedReleaseNoteURL
+            } else if (try? markdownSecondaryLocalizedReleaseNoteURL.checkResourceIsReachable()) ?? false {
+                localizedReleaseNoteURL = markdownSecondaryLocalizedReleaseNoteURL
             } else {
                 localizedReleaseNoteURL = nil
             }
@@ -385,7 +552,7 @@ class ArchiveItem: CustomStringConvertible {
             if let localizedReleaseNoteURL = localizedReleaseNoteURL,
                let localizedReleaseNoteRemoteURL = self.releaseNoteURL(for: localizedReleaseNoteURL.lastPathComponent)
             {
-                localizedReleaseNotes.append((languageCode, localizedReleaseNoteRemoteURL))
+                localizedReleaseNotes.append((languageCode, localizedReleaseNoteRemoteURL, localizedReleaseNoteURL))
             }
         }
         return localizedReleaseNotes

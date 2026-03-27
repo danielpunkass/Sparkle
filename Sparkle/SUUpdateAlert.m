@@ -18,7 +18,7 @@
 #import "SUReleaseNotesView.h"
 #import "SUWKWebView.h"
 #import "SULegacyWebView.h"
-#import "SUPlainTextReleaseNotesView.h"
+#import "SUTextViewReleaseNotesView.h"
 
 #import "SUConstants.h"
 #import "SULog.h"
@@ -32,8 +32,16 @@
 #import "SPUUserUpdateState.h"
 
 static NSString *const SUUpdateAlertTouchBarIdentifier = @"" SPARKLE_BUNDLE_IDENTIFIER ".SUUpdateAlert";
+static NSString *const SUAllowsAutomaticUpdatesKeyPath = @"allowsAutomaticUpdates";
 
 static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
+
+typedef NS_ENUM(NSInteger, SUReleaseNotesFormat)
+{
+    SUReleaseNotesFormatHTML,
+    SUReleaseNotesFormatPlainText,
+    SUReleaseNotesFormatMarkdown
+};
 
 @interface SUUpdateAlert () <NSTouchBarDelegate>
 @end
@@ -48,6 +56,8 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     id<SUReleaseNotesView> _releaseNotesView;
     id<SUVersionDisplay> _versionDisplayer;
     
+    __weak id<SPUStandardUserDriverDelegate> _delegate;
+    
     IBOutlet NSStackView *_stackView;
     IBOutlet NSButton *_installButton;
     IBOutlet NSButton *_laterButton;
@@ -60,11 +70,10 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     void (^_didBecomeKeyBlock)(void);
     void(^_completionBlock)(SPUUserUpdateChoice, NSRect, BOOL);
     
-    BOOL _allowsAutomaticUpdates;
     BOOL _windowLoadedAndShowsReleaseNotes;
 }
 
-- (instancetype)initWithAppcastItem:(SUAppcastItem *)item state:(SPUUserUpdateState *)state host:(SUHost *)aHost versionDisplayer:(id<SUVersionDisplay>)versionDisplayer completionBlock:(void (^)(SPUUserUpdateChoice, NSRect, BOOL))completionBlock didBecomeKeyBlock:(void (^)(void))didBecomeKeyBlock
+- (instancetype)initWithAppcastItem:(SUAppcastItem *)item state:(SPUUserUpdateState *)state host:(SUHost *)aHost versionDisplayer:(id<SUVersionDisplay>)versionDisplayer updaterSettings:(SPUUpdaterSettings *)updaterSettings delegate:(id<SPUStandardUserDriverDelegate>)delegate completionBlock:(void (^)(SPUUserUpdateChoice, NSRect, BOOL))completionBlock didBecomeKeyBlock:(void (^)(void))didBecomeKeyBlock
 {
     self = [super initWithWindowNibName:@"SUUpdateAlert"];
     if (self != nil) {
@@ -73,27 +82,24 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
         _versionDisplayer = versionDisplayer;
         
         _state = state;
+        _delegate = delegate;
         _completionBlock = [completionBlock copy];
         _didBecomeKeyBlock = [didBecomeKeyBlock copy];
         
-        _updaterSettings = [[SPUUpdaterSettings alloc] initWithHostBundle:aHost.bundle];
-        
-        BOOL allowsAutomaticUpdates;
-        NSNumber *allowsAutomaticUpdatesOption = _updaterSettings.allowsAutomaticUpdatesOption;
-        if (item.informationOnlyUpdate) {
-            allowsAutomaticUpdates = NO;
-        } else if (allowsAutomaticUpdatesOption == nil) {
-            allowsAutomaticUpdates = _updaterSettings.automaticallyChecksForUpdates;
-        } else {
-            allowsAutomaticUpdates = allowsAutomaticUpdatesOption.boolValue;
-        }
-        _allowsAutomaticUpdates = allowsAutomaticUpdates;
+        _updaterSettings = updaterSettings;
         
         [self setShouldCascadeWindows:NO];
     } else {
         assert(false);
     }
     return self;
+}
+
+- (void)dealloc
+{
+    if (self.windowLoaded) {
+        [_updaterSettings removeObserver:self forKeyPath:SUAllowsAutomaticUpdatesKeyPath];
+    }
 }
 
 - (NSString *)description
@@ -154,7 +160,7 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
 
 - (void)displayReleaseNotesSpinner SPU_OBJC_DIRECT
 {
-    // Stick a nice big spinner in the middle of the web view until the page is loaded.
+    // Stick a nice big spinner in the middle of the release notes view until the page is loaded.
     _releaseNotesSpinner = [[NSProgressIndicator alloc] init];
     _releaseNotesSpinner.controlSize = NSControlSizeRegular;
     [_releaseNotesSpinner setStyle:NSProgressIndicatorStyleSpinning];
@@ -170,23 +176,28 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     _releaseNotesSpinner.displayedWhenStopped = NO;
     [_releaseNotesSpinner startAnimation:self];
     
-    // If there's no release notes URL, just stick the contents of the description into the web view
+    // If there's no release notes URL, just stick the contents of the description into the release notes view
     // Otherwise we'll wait until the client wants us to show release notes
     if (_updateItem.releaseNotesURL == nil) {
         NSString *itemDescription = _updateItem.itemDescription;
         if (itemDescription != nil) {
             NSString *itemDescriptionFormat = _updateItem.itemDescriptionFormat;
-            // We don't support markdown but prepare for the future in case we support it one day
-            BOOL prefersPlainText =
-                ([itemDescriptionFormat isEqualToString:@"plain-text"] ||
-                 [itemDescriptionFormat isEqualToString:@"markdown"]);
             
-            [self _createReleaseNotesViewPreferringPlainText:prefersPlainText];
+            SUReleaseNotesFormat releaseNotesFormat;
+            if ([itemDescriptionFormat isEqualToString:@"plain-text"]) {
+                releaseNotesFormat = SUReleaseNotesFormatPlainText;
+            } else if ([itemDescriptionFormat isEqualToString:@"markdown"]) {
+                releaseNotesFormat = SUReleaseNotesFormatMarkdown;
+            } else {
+                releaseNotesFormat = SUReleaseNotesFormatHTML;
+            }
+            
+            [self _createReleaseNotesViewPreferringFormat:releaseNotesFormat];
             
             __weak __typeof__(self) weakSelf = self;
             [_releaseNotesView loadString:itemDescription baseURL:nil completionHandler:^(NSError * _Nullable error) {
                 if (error != nil) {
-                    SULog(SULogLevelError, @"Failed to load HTML string from web view: %@", error);
+                    SULog(SULogLevelError, @"Failed to load HTML string from release notes view: %@", error);
                 }
                 [weakSelf stopReleaseNotesSpinner];
             }];
@@ -217,28 +228,43 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     
     // We don't support markdown but prepare for the future in case we support it one day
     NSString *pathExtension = releaseNotesURL.pathExtension;
-    BOOL preferringPlainText =
-        ([chosenMIMEType isEqualToString:@"text/plain"] ||
-         [pathExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame ||
-         [chosenMIMEType isEqualToString:@"text/markdown"] ||
-         [chosenMIMEType isEqualToString:@"text/x-markdown"] ||
-         [pathExtension caseInsensitiveCompare:@"md"] == NSOrderedSame ||
-         [pathExtension caseInsensitiveCompare:@"markdown"] == NSOrderedSame);
     
-    [self _createReleaseNotesViewPreferringPlainText:preferringPlainText];
+    SUReleaseNotesFormat releaseNotesFormat;
+    // Make sure we test for markdown first because text/plain may be used for MIME type
+    if ([chosenMIMEType isEqualToString:@"text/markdown"] ||
+               [chosenMIMEType isEqualToString:@"text/x-markdown"] ||
+               [pathExtension caseInsensitiveCompare:@"md"] == NSOrderedSame ||
+               [pathExtension caseInsensitiveCompare:@"markdown"] == NSOrderedSame) {
+        releaseNotesFormat = SUReleaseNotesFormatMarkdown;
+    } else if ([chosenMIMEType isEqualToString:@"text/plain"] || [pathExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame) {
+        releaseNotesFormat = SUReleaseNotesFormatPlainText;
+    } else {
+        releaseNotesFormat = SUReleaseNotesFormatHTML;
+    }
+    
+    [self _createReleaseNotesViewPreferringFormat:releaseNotesFormat];
     
     __weak __typeof__(self) weakSelf = self;
     [_releaseNotesView loadData:downloadData.data MIMEType:chosenMIMEType textEncodingName:chosenTextEncodingName baseURL:baseURL completionHandler:^(NSError * _Nullable error) {
         if (error != nil) {
-            SULog(SULogLevelError, @"Failed to load data from web view: %@", error);
+            SULog(SULogLevelError, @"Failed to load data from release notes view: %@", error);
         }
         [weakSelf stopReleaseNotesSpinner];
     }];
 }
 
-- (void)showReleaseNotesFailedToDownload
+- (void)showReleaseNotesFailedToDownloadWithError:(NSError *)error
 {
-    [self stopReleaseNotesSpinner];
+    [self _createReleaseNotesViewPreferringFormat:SUReleaseNotesFormatPlainText];
+    
+    __weak __typeof__(self) weakSelf = self;
+    [_releaseNotesView loadString:error.localizedDescription baseURL:nil completionHandler:^(NSError * _Nullable loadCompletionError) {
+        if (loadCompletionError != nil) {
+            SULog(SULogLevelError, @"Failed to load HTML error string from release notes view: %@", loadCompletionError);
+        }
+        
+        [weakSelf stopReleaseNotesSpinner];
+    }];
 }
 
 - (void)stopReleaseNotesSpinner SPU_OBJC_DIRECT
@@ -248,7 +274,7 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
 
 - (BOOL)showsReleaseNotes
 {
-    NSNumber *shouldShowReleaseNotes = [_host objectForInfoDictionaryKey:SUShowReleaseNotesKey];
+    NSNumber *shouldShowReleaseNotes = [_host boolNumberForInfoDictionaryKey:SUShowReleaseNotesKey];
     if (shouldShowReleaseNotes == nil) {
         // Don't show release notes if RSS item contains no description and no release notes URL:
         return (([_updateItem itemDescription] != nil
@@ -259,34 +285,40 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
         return [shouldShowReleaseNotes boolValue];
 }
 
-- (void)_createReleaseNotesViewPreferringPlainText:(BOOL)preferringPlainText SPU_OBJC_DIRECT
+- (void)_createReleaseNotesViewPreferringFormat:(SUReleaseNotesFormat)preferredReleaseNotesFormat SPU_OBJC_DIRECT
 {
     // "-apple-system-font" is a reference to the system UI font. "-apple-system" is the new recommended token, but for backward compatibility we can't use it.
     NSString *defaultFontFamily = @"-apple-system-font";
     
     int defaultFontSize = (int)[NSFont systemFontSize];
     
-    BOOL usesPlainText;
-    if (preferringPlainText) {
-        usesPlainText = YES;
-    } else {
-        if (@available(macOS 10.15, *)) {
-            usesPlainText = [[NSProcessInfo processInfo] isMacCatalystApp];
-            
-            if (usesPlainText && !preferringPlainText) {
-                SULog(SULogLevelError, @"Error: Showing HTML release notes for Catalyst apps is not supported. The release notes will be interpreted as plain text. Please serve a plain-text (.txt) release notes file. If you are using a <description> element then please specify the %@=\"plain-text\" attribute in that element.", SUAppcastAttributeFormat);
+    SUReleaseNotesFormat usedReleaseNotesFormat;
+    switch (preferredReleaseNotesFormat) {
+        case SUReleaseNotesFormatPlainText:
+        case SUReleaseNotesFormatMarkdown:
+            usedReleaseNotesFormat = preferredReleaseNotesFormat;
+            break;
+        case SUReleaseNotesFormatHTML:
+            if (@available(macOS 10.15, *)) {
+                if ([[NSProcessInfo processInfo] isMacCatalystApp]) {
+                    usedReleaseNotesFormat = SUReleaseNotesFormatPlainText;
+                    
+                    SULog(SULogLevelError, @"Error: Showing HTML release notes for Catalyst apps is not supported. The release notes will be interpreted as plain text. Please serve a plain-text (.txt) or markdown (.md) release notes file. If you are using a <description> element then please specify the %@=\"plain-text\" or %@=\"markdown\" attribute in that element.", SUAppcastAttributeFormat, SUAppcastAttributeFormat);
+                } else {
+                    usedReleaseNotesFormat = preferredReleaseNotesFormat;
+                }
+            } else {
+                usedReleaseNotesFormat = preferredReleaseNotesFormat;
             }
-        } else {
-            usesPlainText = NO;
-        }
+            break;
     }
     
     NSArray<NSString *> *customAllowedURLSchemes;
     {
         NSMutableArray<NSString *> *allowedSchemes = [NSMutableArray array];
-        id hostAllowedURLSchemes = [_host objectForInfoDictionaryKey:SUAllowedURLSchemesKey];
-        if ([(NSObject *)hostAllowedURLSchemes isKindOfClass:[NSArray class]]) {
-            for (id urlScheme in (NSArray *)hostAllowedURLSchemes) {
+        NSArray *hostAllowedURLSchemes = [_host objectForInfoDictionaryKey:SUAllowedURLSchemesKey ofClass:NSArray.class];
+        if (hostAllowedURLSchemes != nil) {
+            for (id urlScheme in hostAllowedURLSchemes) {
                 if ([(NSObject *)urlScheme isKindOfClass:[NSString class]]) {
                     NSString *allowedURLScheme = [(NSString *)urlScheme lowercaseString];
                     if (![allowedURLScheme isEqualToString:@"file"]) {
@@ -301,20 +333,32 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
         customAllowedURLSchemes = [allowedSchemes copy];
     }
     
-    if (usesPlainText) {
-        _releaseNotesView = [[SUPlainTextReleaseNotesView alloc] initWithFontPointSize:defaultFontSize customAllowedURLSchemes:customAllowedURLSchemes];
-    } else {
-        NSURL *colorStyleURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"ReleaseNotesColorStyle" withExtension:@"css"];
-        
-        BOOL javaScriptEnabled = [_host boolForInfoDictionaryKey:SUEnableJavaScriptKey];
-        
+    id<SPUStandardUserDriverDelegate> delegate = _delegate;
+    switch (usedReleaseNotesFormat) {
+        case SUReleaseNotesFormatPlainText:
+            _releaseNotesView = [[SUTextViewReleaseNotesView alloc] initWithFontPointSize:defaultFontSize appcastItem:_updateItem host:_host delegate:delegate prefersMarkdown:NO customAllowedURLSchemes:customAllowedURLSchemes];
+            break;
+        case SUReleaseNotesFormatMarkdown:
+            _releaseNotesView = [[SUTextViewReleaseNotesView alloc] initWithFontPointSize:defaultFontSize appcastItem:_updateItem host:_host delegate:delegate prefersMarkdown:YES customAllowedURLSchemes:customAllowedURLSchemes];
+            break;
+        case SUReleaseNotesFormatHTML:
+        {
+            NSURL *colorStyleURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"ReleaseNotesColorStyle" withExtension:@"css"];
+            
+            BOOL javaScriptEnabled = [_host boolForInfoDictionaryKey:SUEnableJavaScriptKey];
+            
 #if DOWNLOADER_XPC_SERVICE_EMBEDDED
 		if ([_host requiresLegacyWebView]) {
 			_releaseNotesView = [[SULegacyWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes];
         } else
 #endif
-        {
-            _releaseNotesView = [[SUWKWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes installedVersion: _host.version];
+            {
+                BOOL allowsLoadingExternalReferences = (_updateItem.signingValidationStatus == SPUAppcastSigningValidationStatusSkipped);
+                
+                _releaseNotesView = [[SUWKWebView alloc] initWithColorStyleSheetLocation:colorStyleURL fontFamily:defaultFontFamily fontPointSize:defaultFontSize javaScriptEnabled:javaScriptEnabled customAllowedURLSchemes:customAllowedURLSchemes allowsLoadingExternalReferences:allowsLoadingExternalReferences installedVersion:_host.version];
+            }
+            
+            break;
         }
     }
     
@@ -322,13 +366,22 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     [_releaseNotesContentView addSubview:_releaseNotesView.view positioned:NSWindowBelow relativeTo:_releaseNotesSpinner];
     
     _releaseNotesView.view.frame = _releaseNotesContentView.bounds;
-    _releaseNotesView.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    _releaseNotesView.view.autoresizingMask = (NSAutoresizingMaskOptions)(NSViewWidthSizable | NSViewHeightSizable);
     
     if (@available(macOS 10.14, *)) {
         // We need a transparent background
         // This avoids a "white flash" that may be present when the webview initially loads in dark mode
         // This also is necessary for macOS 10.14, otherwise the background may stay white on 10.14 (but not in later OS's)
         [_releaseNotesView setDrawsBackground:NO];
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSString *,id> *)change context:(void *)context
+{
+    if ([keyPath isEqualToString:SUAllowsAutomaticUpdatesKeyPath]) {
+        _automaticallyInstallUpdatesButton.superview.hidden = !_updaterSettings.allowsAutomaticUpdates;
+    } else {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
     }
 }
 
@@ -381,7 +434,7 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
         window.frameAutosaveName = @"SUUpdateAlert2";
     } else {
         // Update alert should not be resizable when no release notes are available
-        window.styleMask &= ~NSWindowStyleMaskResizable;
+        window.styleMask = (NSWindowStyleMask)(window.styleMask & ~NSWindowStyleMaskResizable);
     }
     _windowLoadedAndShowsReleaseNotes = showReleaseNotes;
 
@@ -389,8 +442,6 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
         [_installButton setTitle:SULocalizedStringFromTableInBundle(@"Learn More…", SPARKLE_TABLE, sparkleBundle, @"Alternate title for 'Install Update' button when there's no download in RSS feed.")];
         [_installButton setAction:@selector(openInfoURL:)];
     }
-
-    BOOL allowsAutomaticUpdates = _allowsAutomaticUpdates;
     
     if (showReleaseNotes) {
         [self displayReleaseNotesSpinner];
@@ -403,9 +454,7 @@ static const CGFloat SUUpdateAlertGroupElementSpacing = 12.0;
     
     // NOTE: The code below for deciding what buttons to hide is complex! Due to array of feature configurations :)
     
-    if (!allowsAutomaticUpdates) {
-        _automaticallyInstallUpdatesButton.superview.hidden = YES;
-    }
+    [_updaterSettings addObserver:self forKeyPath:SUAllowsAutomaticUpdatesKeyPath options:(NSKeyValueObservingOptions)(NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew) context:NULL];
     
     if (_state.stage == SPUUserUpdateStageInstalling) {
         // We're going to be relaunching pretty instantaneously

@@ -23,7 +23,7 @@ struct Appcast {
     let deltaFromVersionsUsed: Set<UpdateVersion>
 }
 
-func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory cacheDir: URL, keys: PrivateKeys, versions: Set<String>?, maxVersionsPerBranchInFeed: Int, newChannel: String?, majorVersion: String?, maximumDeltas: Int, deltaCompressionModeDescription: String, deltaCompressionLevel: UInt8, disableNestedCodeCheck: Bool, downloadURLPrefix: URL?, releaseNotesURLPrefix: URL?, verbose: Bool) throws -> [FeedName: Appcast] {
+func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory cacheDir: URL, keys: PrivateKeys, versions: Set<String>?, maxVersionsPerBranchInFeed: Int, newChannel: String?, newMinimumUpdateVersion: String?, majorVersion: String?, maximumDeltas: Int, deltaCompressionModeDescription: String, deltaCompressionLevel: UInt8, disableNestedCodeCheck: Bool, downloadURLPrefix: URL?, releaseNotesURLPrefix: URL?, verbose: Bool) throws -> [FeedName: Appcast] {
     let standardComparator = SUStandardVersionComparator()
     let descendingVersionComparator: (String, String) -> Bool = {
         return standardComparator.compareVersion($0, toVersion: $1) == .orderedDescending
@@ -45,7 +45,13 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
     // Group updates by appcast feed
     var updatesByAppcast: [FeedName: [ArchiveItem]] = [:]
     for update in allUpdates {
-        let appcastFile = update.feedURL?.lastPathComponent ?? "appcast.xml"
+        let appcastFile: String
+        if let lastComponent = update.feedURL?.lastPathComponent, !lastComponent.isEmpty {
+            appcastFile = lastComponent
+        } else {
+            appcastFile = "appcast.xml"
+        }
+        
         updatesByAppcast[appcastFile, default: []].append(update)
     }
     
@@ -114,7 +120,7 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
         do {
             for update in updates {
                 if !ignoredOldVersions.contains(update.version) && !ignoredVersionsToInsert.contains(update.version) && feedUpdateBranches[update.version] == nil {
-                    newUpdateBranches[update.version] = UpdateBranch(minimumSystemVersion: update.minimumSystemVersion, maximumSystemVersion: nil, minimumAutoupdateVersion: majorVersion, channel: newChannel)
+                    newUpdateBranches[update.version] = UpdateBranch(minimumUpdateVersion: newMinimumUpdateVersion, minimumSystemVersion: update.minimumSystemVersion, maximumSystemVersion: nil, minimumAutoupdateVersion: majorVersion, hardwareRequirements: update.hardwareRequirements, channel: newChannel)
                 }
             }
         }
@@ -147,7 +153,7 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
                         continue
                     }
                     
-                    let defaultChannelBranch = UpdateBranch(minimumSystemVersion: branch.minimumSystemVersion, maximumSystemVersion: branch.maximumSystemVersion, minimumAutoupdateVersion: branch.minimumAutoupdateVersion, channel: nil)
+                    let defaultChannelBranch = UpdateBranch(minimumUpdateVersion: branch.minimumUpdateVersion, minimumSystemVersion: branch.minimumSystemVersion, maximumSystemVersion: branch.maximumSystemVersion, minimumAutoupdateVersion: branch.minimumAutoupdateVersion, hardwareRequirements: branch.hardwareRequirements, channel: nil)
                     
                     guard let defaultChannelVersions = updatesGroupedByBranch[defaultChannelBranch] else {
                         continue
@@ -227,6 +233,7 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
             // but we still wanted to record the used delta updates for a batch of recent updates
             // This is to support rollback in case the top newly generated update isn't exactly what the user wants
             let generatingDeltas = latestVersionPerBranch.contains(version)
+            let itemDeltasLock = NSLock()
             var numDeltas = 0
             let appBaseName = latestItem.appPath.deletingPathExtension().lastPathComponent
             for item in updates {
@@ -241,6 +248,13 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
                 
                 // Old version will not be able to verify the new version
                 if !item.supportsDSA && item.publicEdKey == nil {
+                    continue
+                }
+                
+                // No need to generate delta updates that don't match minimumUpdateVersion
+                if let latestUpdateBranch = feedUpdateBranches[latestItem.version] ?? newUpdateBranches[latestItem.version],
+                   let latestMinimumUpdateVersion = latestUpdateBranch.minimumUpdateVersion,
+                   standardComparator.compareVersion(item.version, toVersion: latestMinimumUpdateVersion) == .orderedAscending {
                     continue
                 }
 
@@ -347,6 +361,10 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
                     markDeltaAsIgnored(delta: delta, markerPath: ignoreMarkerPath)
                     continue
                 }
+                
+                itemDeltasLock.lock()
+                latestItem.deltas.append(delta)
+                itemDeltasLock.unlock()
 
                 group.enter()
                 DispatchQueue.global().async {
@@ -371,11 +389,13 @@ func makeAppcasts(archivesSourceDir: URL, outputPathURL: URL?, cacheDirectory ca
 #if GENERATE_APPCAST_BUILD_LEGACY_DSA_SUPPORT
                         hasAnyDSASignature = hasAnyDSASignature || (delta.dsaSignature != nil)
 #endif
-                        if hasAnyDSASignature {
-                            latestItem.deltas.append(delta)
-                        } else {
+                        if !hasAnyDSASignature {
                             markDeltaAsIgnored(delta: delta, markerPath: ignoreMarkerPath)
                             print("Delta \(delta.archivePath.path) ignored, because it could not be signed")
+                            
+                            itemDeltasLock.lock()
+                            latestItem.deltas.removeAll { $0 === delta }
+                            itemDeltasLock.unlock()
                         }
                     }
                     group.leave()
@@ -464,12 +484,18 @@ func moveOldUpdatesFromAppcasts(archivesSourceDir: URL, oldFilesDirectory: URL, 
             
             let htmlReleaseNotesFile = archivePath.deletingPathExtension().appendingPathExtension("html")
             let plainTextReleaseNotesFile = archivePath.deletingPathExtension().appendingPathExtension("txt")
+            let markdownReleaseNotesFile = archivePath.deletingPathExtension().appendingPathExtension("md")
+            let markdownSecondaryReleaseNotesFile = archivePath.deletingPathExtension().appendingPathExtension("markdown")
             
             let releaseNotesFile: URL?
             if fileManager.fileExists(atPath: htmlReleaseNotesFile.path) {
                 releaseNotesFile = htmlReleaseNotesFile
             } else if fileManager.fileExists(atPath: plainTextReleaseNotesFile.path) {
                 releaseNotesFile = plainTextReleaseNotesFile
+            } else if fileManager.fileExists(atPath: markdownReleaseNotesFile.path) {
+                releaseNotesFile = markdownReleaseNotesFile
+            } else if fileManager.fileExists(atPath: markdownSecondaryReleaseNotesFile.path) {
+                releaseNotesFile = markdownSecondaryReleaseNotesFile
             } else {
                 releaseNotesFile = nil
             }

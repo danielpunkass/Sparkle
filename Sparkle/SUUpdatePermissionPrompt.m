@@ -75,12 +75,12 @@ static NSString *const SUUpdatePermissionPromptTouchBarIdentifier = @"" SPARKLE_
 
 - (BOOL)shouldAskAboutProfile
 {
-    return [(NSNumber *)[_host objectForInfoDictionaryKey:SUEnableSystemProfilingKey] boolValue];
+    return [_host boolForInfoDictionaryKey:SUEnableSystemProfilingKey];
 }
 
 - (BOOL)allowsAutomaticUpdates
 {
-    NSNumber *allowsAutomaticUpdates = [_host objectForInfoDictionaryKey:SUAllowsAutomaticUpdatesKey];
+    NSNumber *allowsAutomaticUpdates = [_host boolNumberForInfoDictionaryKey:SUAllowsAutomaticUpdatesKey];
     return (allowsAutomaticUpdates == nil || allowsAutomaticUpdates.boolValue);
 }
 

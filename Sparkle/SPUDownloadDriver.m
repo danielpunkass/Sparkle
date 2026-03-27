@@ -81,11 +81,20 @@
                     if (strongSelf != nil && !strongSelf->_retrievedDownloadResult && !strongSelf->_cleaningUp) {
                         strongSelf->_downloader = nil;
                         
-                        SULog(SULogLevelError, @"Connection to update downloader was invalidated");
+                        NSString *additionalFailureReason;
+                        {
+                            NSString *executableFailureReason;
+                            if (!SPUXPCServiceHasExecutablePermission(@DOWNLOADER_NAME, &executableFailureReason)) {
+                                additionalFailureReason = [NSString stringWithFormat:@" %@", executableFailureReason];
+                            } else {
+                                additionalFailureReason = @"";
+                            }
+                        }
                         
                         NSDictionary *userInfo =
                         @{
                           NSLocalizedDescriptionKey: SULocalizedStringFromTableInBundle(@"An error occurred while downloading the update. Please try again later.", SPARKLE_TABLE, SUSparkleBundle(), nil),
+                          NSLocalizedFailureReasonErrorKey: [NSString stringWithFormat:@"If your app is not sandboxed or has com.apple.security.network.client set to YES, please remove %@ from your Info.plist. Please also check Console logs for "@DOWNLOADER_NAME" if there are any additional details.%@", SUEnableDownloaderServiceKey, additionalFailureReason]
                           };
                         
                         NSError *downloadError = [NSError errorWithDomain:SUSparkleErrorDomain code:SUDownloadError userInfo:userInfo];
@@ -113,6 +122,10 @@
         _inBackground = background;
         
         NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:requestURL];
+        // Note the cachePolicy has no effect on persistent downloads on disk (i.e downloading update archives)
+        // It impacts temporary in-memory downloads such as appcast feeds and release notes.
+        // For now we don't use caching, but with more testing/experimenting that could change
+        // (e.g. not downloading same feed unmodified from previous request).
         request.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
         
         if (userAgent != nil) {
@@ -148,6 +161,8 @@
 
 - (void)downloadFile
 {
+    assert(NSThread.isMainThread);
+    
     id<SPUDownloadDriverDelegate> delegate = _delegate;
     if ([delegate respondsToSelector:@selector(downloadDriverWillBeginDownload)]) {
         [delegate downloadDriverWillBeginDownload];

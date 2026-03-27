@@ -9,6 +9,7 @@
 #import "SPUUpdater.h"
 #import "SPUUpdaterDelegate.h"
 #import "SPUUpdaterSettings.h"
+#import "SPUUpdaterSettings+Debug.h"
 #import "SUHost.h"
 #import "SPUUpdatePermissionRequest.h"
 #import "SUUpdatePermissionResponse.h"
@@ -175,7 +176,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         // We perform this check one runloop cycle after starting the updater to give the developer
         // a chance to call -clearFeedURLFromUserDefaults before this warning can show up
         if (self->_updatingMainBundle) {
-            NSString *appcastUserDefaultsString = [self->_host objectForUserDefaultsKey:SUFeedURLKey];
+            NSString *appcastUserDefaultsString = [self->_host objectForUserDefaultsKey:SUFeedURLKey ofClass:NSString.class];
             if (appcastUserDefaultsString != nil) {
                 SULog(SULogLevelError, @"Warning: A feed URL was found stored in user defaults for %@. This was likely set using -[SPUUpdater setFeedURL:] which is deprecated. Please migrate away from using this API and call -[SPUUpdater clearFeedURLFromUserDefaults] to remove any stored defaults, otherwise Sparkle may continue to use the feed stored from the defaults. If the feed url was set via a defaults write command for testing purposes, then please ignore this warning.", self->_host.name);
             }
@@ -295,7 +296,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
             
             BOOL foundATSMainBundleIssue = NO;
             if (!foundATSPersistentIssue && !foundXPCDownloaderService) {
-                BOOL foundATSIssue = ([mainBundleHost objectForInfoDictionaryKey:@"NSAppTransportSecurity"] == nil);
+                BOOL foundATSIssue = ([mainBundleHost objectForInfoDictionaryKey:@"NSAppTransportSecurity" ofClass:NSDictionary.class] == nil);
                 
                 if (_updatingMainBundle) {
                     // The only way we'll know for sure if there is an issue is if the main bundle is the same as the one we're updating
@@ -306,7 +307,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
             
             if (foundATSPersistentIssue || foundATSMainBundleIssue) {
                 // Just log a warning. Don't outright fail in case we are wrong (eg: app is linked on an old SDK where ATS doesn't take effect)
-                SULog(SULogLevelDefault, @"The feed URL (%@) may need to change to use HTTPS.\nFor more information: https://sparkle-project.org/documentation/app-transport-security", [feedURL absoluteString]);
+                SULog(SULogLevelDefault, @"The feed URL (%@) may need to change to use HTTPS. If the feed URL is using local networking for testing, this warning may be incorrect and ignored however.\nFor more information: https://sparkle-project.org/documentation/app-transport-security", [feedURL absoluteString]);
                 
                 _loggedATSWarning = YES;
             }
@@ -366,6 +367,21 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         }
     }
     
+    // This is a policy decision
+    // If developers want greater security by signing appcasts, we can also enforce greater security
+    // in validating updates before extracting them.
+    BOOL requiresSignedFeed = [_host boolForInfoDictionaryKey:SURequireSignedFeedKey];
+    if (requiresSignedFeed) {
+        BOOL verifyBeforeExtraction = [_host boolForInfoDictionaryKey:SUVerifyUpdateBeforeExtractionKey];
+        if (!verifyBeforeExtraction) {
+            if (error != NULL) {
+                *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUInvalidUpdaterError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"For security reasons, %@ needs to also be enabled if %@ is enabled for %@. Visit Sparkle's documentation for more information: https://sparkle-project.org/documentation/customization/", SUVerifyUpdateBeforeExtractionKey, SURequireSignedFeedKey, hostName] }];
+            }
+            
+            return NO;
+        }
+    }
+    
     if (_updatingMainBundle) {
         if (!_loggedUpdateSecurityPolicyWarning && mainBundleHost.hasUpdateSecurityPolicy) {
             SULog(SULogLevelDefault, @"Warning: %@ has a custom NSUpdateSecurityPolicy in its Info.plist. This may cause issues when installing updates. Please consider removing this key for your builds using Sparkle if you do not really require a custom update security policy.", hostName);
@@ -388,7 +404,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     
     // If the user has been asked about automatic checks or the developer has overridden the setting, don't bother prompting
     // When the user answers to the permission prompt, this will be set to either @YES or @NO instead of nil
-    if ([_host objectForKey:SUEnableAutomaticChecksKey] != nil) {
+    if ([_host boolNumberForKey:SUEnableAutomaticChecksKey] != nil) {
         shouldPrompt = NO;
     }
     // Does the delegate want to take care of the logic for when we should ask permission to update?
@@ -468,7 +484,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     
     if (_updateLastCheckedDate == nil)
     {
-        _updateLastCheckedDate = [_host objectForUserDefaultsKey:SULastCheckTimeKey];
+        _updateLastCheckedDate = [_host objectForUserDefaultsKey:SULastCheckTimeKey ofClass:NSDate.class];
     }
     
     return _updateLastCheckedDate;
@@ -508,14 +524,15 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
             [SPUProbeInstallStatus probeInstallerUpdateItemForHostBundleIdentifier:hostBundleIdentifier completion:^(SPUInstallationInfo * _Nullable installationInfo) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     NSTimeInterval regularCheckInterval = [self updateCheckInterval];
+                    NSTimeInterval impatientCheckInterval = [self->_updaterSettings impatientUpdateCheckInterval];
                     if (installationInfo == nil) {
                         // Proceed as normal if there's no resumable updates
                         completionHandler(regularCheckInterval);
                     } else {
-                        if (!installationInfo.canSilentlyInstall || [installationInfo.appcastItem isCriticalUpdate] || [installationInfo.appcastItem isInformationOnlyUpdate]) {
-                            completionHandler(MIN(regularCheckInterval, SUImpatientUpdateCheckInterval));
+                        if ([installationInfo.appcastItem isCriticalUpdate] || [installationInfo.appcastItem isInformationOnlyUpdate]) {
+                            completionHandler(MIN(regularCheckInterval, impatientCheckInterval));
                         } else {
-                            completionHandler(MAX(regularCheckInterval, SUImpatientUpdateCheckInterval));
+                            completionHandler(MAX(regularCheckInterval, impatientCheckInterval));
                         }
                     }
                 });
@@ -548,9 +565,11 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
                 intervalSinceCheck = 0;
             }
             
+            NSTimeInterval minimumUpdateCheckInterval = self->_updaterSettings.minimumUpdateCheckInterval;
+            
             // Now we want to figure out how long until we check again.
-            if (updateCheckInterval < SUMinimumUpdateCheckInterval)
-                updateCheckInterval = SUMinimumUpdateCheckInterval;
+            if (updateCheckInterval < minimumUpdateCheckInterval)
+                updateCheckInterval = minimumUpdateCheckInterval;
             if (intervalSinceCheck < updateCheckInterval) {
                 NSTimeInterval delayUntilCheck = (updateCheckInterval - intervalSinceCheck); // It hasn't been long enough.
                 if ([delegate respondsToSelector:@selector(updater:willScheduleUpdateCheckAfterDelay:)]) {
@@ -561,7 +580,9 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
                     [(id<SPUGentleUserDriverReminders>)self->_userDriver logGentleScheduledUpdateReminderWarningIfNeeded];
                 }
                 
-                [self->_updaterTimer startAndFireAfterDelay:delayUntilCheck];
+                uint64_t leewayUpdateCheckInterval = self->_updaterSettings.leewayUpdateCheckInterval;
+                
+                [self->_updaterTimer startAndFireAfterDelay:delayUntilCheck leewayUpdateCheckInterval:leewayUpdateCheckInterval];
             } else {
                 // We're overdue! Run one now.
                 [self _checkForUpdatesInBackground];
@@ -647,7 +668,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     
     if (_updatingMainBundle) {
         // Check if Sparkle is configured to ask the user's permission to enable automatic update checks
-        NSNumber *automaticChecksInInfoPlist = [_host objectForInfoDictionaryKey:SUEnableAutomaticChecksKey];
+        NSNumber *automaticChecksInInfoPlist = [_host boolNumberForInfoDictionaryKey:SUEnableAutomaticChecksKey];
         if (automaticChecksInInfoPlist == nil) {
             // Check if automatic update checking is disabled or if the user hasn't given permission for Sparkle to check
             BOOL automaticChecksInDefaults = [self automaticallyChecksForUpdates];
@@ -1050,6 +1071,25 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     return NO;
 }
 
+- (BOOL)allowsAutomaticUpdates
+{
+    if (![NSThread isMainThread]) {
+        SULog(SULogLevelError, @"Error: -[SPUUpdater allowsAutomaticUpdates] must be called on the main thread.");
+    }
+    
+    return [_updaterSettings allowsAutomaticUpdates];
+}
+
++ (NSSet<NSString *> *)keyPathsForValuesAffectingAllowsAutomaticUpdates
+{
+    return [NSSet setWithObject:@"updaterSettings.allowsAutomaticUpdates"];
+}
+
++ (BOOL)automaticallyNotifiesObserversOfAllowsAutomaticUpdates
+{
+    return NO;
+}
+
 - (void)setFeedURL:(NSURL * _Nullable)feedURL
 {
     if (![NSThread isMainThread]) {
@@ -1068,7 +1108,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         SULog(SULogLevelError, @"Error: -[SPUUpdater clearFeedURLFromUserDefaults] must be called on the main thread.");
     }
     
-    NSString *appcastString = [_host objectForUserDefaultsKey:SUFeedURLKey];
+    NSString *appcastString = [_host objectForUserDefaultsKey:SUFeedURLKey ofClass:NSString.class];
     
     [_host setObject:nil forUserDefaultsKey:SUFeedURLKey];
     
@@ -1112,7 +1152,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     }
     
     // Delegate gets first priority for determining the feed URL
-    NSString *appcastString = [_host objectForKey:SUFeedURLKey];
+    NSString *appcastString = [_host objectForKey:SUFeedURLKey ofClass:NSString.class];
     id<SPUUpdaterDelegate> delegate = _delegate;
     if ([delegate respondsToSelector:@selector((feedURLStringForUpdater:))]) {
         NSString *delegateAppcastString = [delegate feedURLStringForUpdater:self];
@@ -1124,7 +1164,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     // A value in the user defaults overrides one in the Info.plist
     // (as this used to be used for setting alternative feed URLs but is now deprecated)
     if (appcastString == nil) {
-        appcastString = [_host objectForKey:SUFeedURLKey];
+        appcastString = [_host objectForKey:SUFeedURLKey ofClass:NSString.class];
     }
     
     if (appcastString == nil) { // Can't find an appcast string!
@@ -1210,7 +1250,7 @@ static NSString *escapeURLComponent(NSString *str) {
 
     // Let's only send the system profiling information once per week at most, so we normalize daily-checkers vs. biweekly-checkers and the such.
     if (sendingSystemProfile) {
-        NSDate *lastSubmitDate = [_host objectForUserDefaultsKey:SULastProfileSubmitDateKey];
+        NSDate *lastSubmitDate = [_host objectForUserDefaultsKey:SULastProfileSubmitDateKey ofClass:NSDate.class];
         if (!lastSubmitDate) {
             lastSubmitDate = [NSDate distantPast];
         }

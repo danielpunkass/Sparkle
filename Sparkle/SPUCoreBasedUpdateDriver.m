@@ -198,9 +198,13 @@
 - (void)clearDownloadedUpdate
 {
     id<NSObject> downloadedUpdateObject = (_resumableUpdate != nil) ? _resumableUpdate : _downloadedUpdateForRemoval;
-    assert(downloadedUpdateObject != nil);
-    
-    if (downloadedUpdateObject != nil && [downloadedUpdateObject isKindOfClass:[SPUDownloadedUpdate class]]) {
+
+    if (downloadedUpdateObject == nil) {
+        SULog(SULogLevelError, @"Warning: clearDownloadedUpdate called but no downloaded update is tracked");
+        return;
+    }
+
+    if ([downloadedUpdateObject isKindOfClass:[SPUDownloadedUpdate class]]) {
         if (_downloadDriver == nil) {
             _downloadDriver = [[SPUDownloadDriver alloc] initWithHost:_host];
         }
@@ -295,9 +299,9 @@
     }
 }
 
-- (void)installerDidFinishPreparationAndWillInstallImmediately:(BOOL)willInstallImmediately silently:(BOOL)willInstallSilently
+- (void)installerDidFinishPreparationAndWillInstallImmediately:(BOOL)willInstallImmediately
 {
-    [_delegate installerDidFinishPreparationAndWillInstallImmediately:willInstallImmediately silently:willInstallSilently];
+    [_delegate installerDidFinishPreparationAndWillInstallImmediately:willInstallImmediately];
 }
 
 - (void)finishInstallationWithResponse:(SPUUserUpdateChoice)response displayingUserInterface:(BOOL)displayingUserInterface

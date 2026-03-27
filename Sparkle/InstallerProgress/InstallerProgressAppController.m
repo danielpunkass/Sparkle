@@ -102,7 +102,7 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
         // This difference is significant. We shouldn't have a model where the 'server' tries to connect to a 'client',
         // nor have a model where a process that runs at the highest level (the installer can run as root) tries to connect to a user level agent or process
         BOOL systemDomain = arguments[2].boolValue;
-        NSXPCConnectionOptions connectionOptions = systemDomain ? NSXPCConnectionPrivileged : 0;
+        NSXPCConnectionOptions connectionOptions = systemDomain ? NSXPCConnectionPrivileged : (NSXPCConnectionOptions)0;
         
         _systemDomain = systemDomain;
         _connection = [[NSXPCConnection alloc] initWithMachServiceName:SPUProgressAgentServiceNameForBundleIdentifier(hostBundleIdentifier) options:connectionOptions];
@@ -320,7 +320,9 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
             NSRunningApplication *firstRunningApplication = runningApplications.firstObject;
             
             BOOL targetDead = (firstRunningApplication == nil || firstRunningApplication.terminated);
-            reply(targetDead);
+            if (reply != NULL) {
+                reply(targetDead);
+            }
             
             self->_repliedToRegistration = YES;
             self->_applicationBundle = applicationBundle;
@@ -358,7 +360,9 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
 #endif
         if (self->_targetRunningApplication != nil && self->_terminationCompletionHandler == nil) {
             if (self->_targetRunningApplication.terminated) {
-                completionHandler();
+                if (completionHandler != NULL) {
+                    completionHandler();
+                }
             } else {
                 self->_terminationCompletionHandler = [completionHandler copy];
                 

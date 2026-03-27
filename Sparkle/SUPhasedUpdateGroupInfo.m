@@ -24,7 +24,9 @@
 
 + (NSNumber*)updateGroupIdentifierForHost:(SUHost*)host SPU_OBJC_DIRECT
 {
-    NSNumber* updateGroupIdentifier = [host objectForUserDefaultsKey:SUUpdateGroupIdentifierKey];
+    // Only Sparkle should set this user default, so we don't need to convert NSString -> integer number
+    // We can just require NSNumber class.
+    NSNumber* updateGroupIdentifier = [host objectForUserDefaultsKey:SUUpdateGroupIdentifierKey ofClass:NSNumber.class];
     if(updateGroupIdentifier == nil) {
         updateGroupIdentifier = [self setNewUpdateGroupIdentifierForHost:host];
     }
@@ -34,7 +36,7 @@
 
 + (NSNumber*)setNewUpdateGroupIdentifierForHost:(SUHost*)host
 {
-    unsigned int r = arc4random_uniform(UINT_MAX);
+    uint32_t r = arc4random_uniform(UINT_MAX);
     NSNumber* updateGroupIdentifier = @(r);
 
     [host setObject:updateGroupIdentifier forUserDefaultsKey:SUUpdateGroupIdentifierKey];

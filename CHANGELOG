@@ -1,3 +1,32 @@
+# 2.9.0
+
+* Add basic markdown support for release notes (requires macOS 12+) including [customizing its presentation](https://sparkle-project.org/documentation/publishing#adapting-markdown-or-plain-text-release-notes) (#2810, #2817) (Zorg)
+* Add support for [signing and verifying appcast feeds](https://sparkle-project.org/documentation#signing-feeds-optional) (#2822, #2828) (Zorg)
+* Add [sparkle:hardwareRequirements](https://sparkle-project.org/documentation/publishing#minimum-system-version-requirements) for enforcing an Apple silicon (arm64) requirement (#2797) (Zorg)
+* Add [sparkle:minimumUpdateVersion](https://sparkle-project.org/documentation/publishing/#upgrading-to-newer-features) for specifying a minimum version an app needs to be on before upgrading (#2811) (Zorg)
+* Add API annotations for Swift concurrency (#2827) (Zorg)
+* Validate Obj-C class when reading objects from user defaults / Info plists (#2782) (Zorg)
+* Download temporary files in-memory using NSURLSessionDataTask (#2825) (Zorg)
+* Allow [impatient update check interval](https://sparkle-project.org/documentation/customization/) to be configured for updates that are downloaded automatically (#2799) (Zorg)
+* Probe agent & status service as soon as we launch it to reduce timeout issues (#2852) (Zorg)
+* Add `allowsAutomaticUpdates` property to determine if automatic downloading/installing of updates option should be enabled (#2809) (Zorg)
+* Add Vietnamese translation (#2816, #2839) (TranPhuong319)
+* Add missing nn language to Installer progress Info.plist (#2818) (Zorg)
+* Improve German localization (#2847) (Marco Hillger)
+* Find non-canonical Sparkle.framework locations in generate_appcast when creating delta updates to determine compatibility (#2833) (Zorg)
+* Make Debug builds of Sparkle use same time interval settings as Release (#2805) (Zorg)
+* Remove sparkle-cli from the binary distribution (#2826) (Zorg)
+* Make generate_appcast deltas order stable and thread-safe (#2848) (Nathan Manceaux-Panot)
+* Fix Xcode 26.4 beta compiler warnings (#2850) (Zorg)
+
+# 2.8.1
+
+* Enforce RunAtLoad to reduce potential timeout issue when launching updater task (#2795) (Zorg)
+* Add missing executable bit permission warnings on connection failure (#2792) (Zorg)
+* Add missing localizations to zh-CN & zh-TW (#2789, #2791) (Francis Feng)
+* Add documentation note for delegates being weakly referenced (#2802) (Zorg)
+* Include app name in startUpdater: failure in SPUStandardUpdaterController (#2780) (Zorg)
+
 # 2.8.0
 
 * UI modernization and macOS Tahoe support
@@ -12,11 +41,21 @@
   * Set STRINGS_FILE_OUTPUT_ENCODING build setting to "binary" (#2712) (Nicolas Kick)
   * Move all localizations to main Sparkle.strings (#2760) (Zorg)
 * Synchronize updater settings with user defaults to fix out-of-sync UI state (#2728) (Zorg)
-* Document and better enforce main thread only requirement for using Sparkle methods (#2746, #2754) (Sebastien Marchand, Zorg)
+* Document and better enforce main thread only requirement for using Sparkle methods (#2746, #2754, #2768)) (Sebastien Marchand, Zorg)
 * Make -[SPUUserDriver showUpdateInFocus] optional (#2717) (Zorg)
 * Add private module map for framework (#2722) (Zorg)
 * Workaround a corner case in which the bundle path of a running application contains Contents/MacOS/Executable (#2726, #2747) (Jeremy Huddleston Sequoia, Zorg)
+* Disable false dependency scan analysis warnings when building Sparkle from source (#2762) (Daniel Jalkut)
 * Refactor the logic for avoiding re-sending the system profile more frequently than once a week (#2720) (Daniel Jalkut)
+* Remove deprecated interactive package installer type (#2767) (Zorg)
+
+# 2.7.3
+
+* Double quote team identifiers in requirement strings to fix crash if Team ID starts with number (#2766) (Zorg)
+
+# 2.7.2
+
+* Harden policy on what operations clients are allowed to take (#2763) (Zorg)
 
 # 2.7.1
 

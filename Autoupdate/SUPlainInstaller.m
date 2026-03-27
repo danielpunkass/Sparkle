@@ -328,7 +328,7 @@
     
     NSBundle *bundle = [NSBundle bundleWithPath:_bundlePath];
     SUHost *updateHost = [[SUHost alloc] initWithBundle:bundle];
-    NSString *updateVersion = [updateHost objectForInfoDictionaryKey:(__bridge NSString *)kCFBundleVersionKey];
+    NSString *updateVersion = [updateHost objectForInfoDictionaryKey:(__bridge NSString *)kCFBundleVersionKey ofClass:NSString.class];
     
     id<SUVersionComparison> comparator = [[SUStandardVersionComparator alloc] init];
     if (!updateVersion || [comparator compareVersion:hostVersion toVersion:updateVersion] == NSOrderedDescending) {
@@ -366,17 +366,16 @@
 //            // This shouldn't happen
 //            _canPerformSafeAtomicSwap = NO;
 //        } else {
-//            updateHasCustomUpdateSecurityPolicy = updateHost.hasUpdateSecurityPolicy;
-//            if (updateHasCustomUpdateSecurityPolicy) {
-//                // We don't handle working around a custom update security policy
-//                _canPerformSafeAtomicSwap = NO;
-//            } else {
-//                NSString *installerTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:mainExecutableURL];
-//                NSString *bundleTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:bundle.bundleURL];
-//                
-//                // If bundleTeamIdentifier is nil, then the update isn't code signed so atomic swap is okay
-//                _canPerformSafeAtomicSwap = (bundleTeamIdentifier == nil || (installerTeamIdentifier != nil && [installerTeamIdentifier isEqualToString:bundleTeamIdentifier]));
-//            }
+//        updateHasCustomUpdateSecurityPolicy = updateHost.hasUpdateSecurityPolicy;
+//        if (updateHasCustomUpdateSecurityPolicy) {
+//            // We don't handle working around a custom update security policy
+//            _canPerformSafeAtomicSwap = NO;
+//        } else {
+//            NSString *installerTeamIdentifier = [SUCodeSigningVerifier teamIdentifierFromMainExecutable];
+//            NSString *bundleTeamIdentifier = [SUCodeSigningVerifier teamIdentifierAtURL:bundle.bundleURL];
+//            
+//            // If bundleTeamIdentifier is nil, then the update isn't code signed so atomic swap is okay
+//            _canPerformSafeAtomicSwap = (bundleTeamIdentifier == nil || (installerTeamIdentifier != nil && [installerTeamIdentifier isEqualToString:bundleTeamIdentifier]));
 //        }
 //    } else {
 //        _canPerformSafeAtomicSwap = YES;
@@ -420,11 +419,6 @@
     if (_temporaryOldDirectory != nil) {
         [fileManager removeItemAtURL:_temporaryOldDirectory error:NULL];
     }
-}
-
-- (BOOL)canInstallSilently
-{
-    return YES;
 }
 
 @end

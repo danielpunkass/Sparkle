@@ -148,21 +148,12 @@
         id updater = _updater;
         
         if (!resuming) {
-#if SPARKLE_BUILD_PACKAGE_SUPPORT
-            // interactive pkg based updates are not supported under root user
-            if ([updateItem.installationType isEqualToString:SPUInstallationTypeInteractivePackage] && geteuid() == 0) {
-                [delegate basicDriverIsRequestingAbortUpdateWithError:[NSError errorWithDomain:SUSparkleErrorDomain code:SUInstallationRootInteractiveError userInfo:@{ NSLocalizedDescriptionKey: SULocalizedStringFromTableInBundle(@"Interactive based packages cannot be installed as the root user.", SPARKLE_TABLE, SUSparkleBundle(), nil) }]];
+            // Give the delegate a chance to bail
+            
+            NSError *shouldNotProceedError = nil;
+            if ([updaterDelegate respondsToSelector:@selector(updater:shouldProceedWithUpdate:updateCheck:error:)] && ![updaterDelegate updater:updater shouldProceedWithUpdate:updateItem updateCheck:_updateCheck error:&shouldNotProceedError]) {
+                [delegate basicDriverIsRequestingAbortUpdateWithError:shouldNotProceedError];
                 return;
-            } else
-#endif
-            {
-                // Give the delegate a chance to bail
-                
-                NSError *shouldNotProceedError = nil;
-                if ([updaterDelegate respondsToSelector:@selector(updater:shouldProceedWithUpdate:updateCheck:error:)] && ![updaterDelegate updater:updater shouldProceedWithUpdate:updateItem updateCheck:_updateCheck error:&shouldNotProceedError]) {
-                    [delegate basicDriverIsRequestingAbortUpdateWithError:shouldNotProceedError];
-                    return;
-                }
             }
         }
         
@@ -211,8 +202,13 @@
                     break;
                 case NSOrderedAscending:
                     // A new update is available but cannot be installed
+                    // More detailed recovery suggestions are in SPUNoUpdateFoundRecoverySuggestion()
                     
-                    if (!latestAppcastItem.minimumOperatingSystemVersionIsOK) {
+                    if (!latestAppcastItem.arm64HardwareRequirementIsOK) {
+                        localizedDescription = SULocalizedStringFromTableInBundle(@"Your Mac is too old", SPARKLE_TABLE, sparkleBundle, nil);
+                        
+                        reason = SPUNoUpdateFoundReasonHardwareDoesNotSupportARM64;
+                    } else if (!latestAppcastItem.minimumOperatingSystemVersionIsOK) {
                         localizedDescription = SULocalizedStringFromTableInBundle(@"Your macOS version is too old", SPARKLE_TABLE, sparkleBundle, nil);
                         
                         reason = SPUNoUpdateFoundReasonSystemIsTooOld;

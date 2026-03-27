@@ -83,6 +83,9 @@ struct GenerateAppcast: ParsableCommand {
     @Option(name: .customLong("ed-key-file"), help: ArgumentHelp("Path to the private EdDSA key file. If not specified, the private EdDSA key will be read from the Keychain instead. '-' can be used to echo the EdDSA key from a 'secret' environment variable to the standard input stream. For example: echo \"$PRIVATE_KEY_SECRET\" | ./\(programName) --ed-key-file -", valueName: "private-EdDSA-key-file"))
     var privateEdKeyPath: String?
     
+    @Flag(name: .long, help: ArgumentHelp("Disables adding a warning to signed appcast and release note files explaining that further modifications will require re-signing them. This flag has no effect if the files already have a signing warning embedded."))
+    var disableSigningWarning: Bool = false
+    
 #if GENERATE_APPCAST_BUILD_LEGACY_DSA_SUPPORT
     @Option(name: .customShort("f"), help: ArgumentHelp("Path to the private DSA key file. Only use this option for transitioning to EdDSA from older updates.", valueName: "private-dsa-key-file"), transform: { URL(fileURLWithPath: $0) })
     var privateDSAKeyURL: URL?
@@ -138,6 +141,9 @@ struct GenerateAppcast: ParsableCommand {
     @Option(name: .long, help: ArgumentHelp("The Sparkle channel name that will be used for generating new updates. By default, no channel is used. Old applications need to be using Sparkle 2 to use this feature.", valueName: "channel-name"))
     var channel: String?
     
+    @Option(name: .long, help: ArgumentHelp("The minimum update version requirement that will be used for generating new updates. By default, no minimum update version is used.", valueName: "minimum-update-version"))
+    var minimumUpdateVersion: String?
+    
     @Option(name: .long, help: ArgumentHelp("The last major or minimum autoupdate sparkle:version that will be used for generating new updates. By default, no last major version is used.", valueName: "major-version"))
     var majorVersion: String?
     
@@ -183,25 +189,26 @@ struct GenerateAppcast: ParsableCommand {
         Use the --versions option if you need to insert an update that is older than the latest update in your feed, or
         if you need to insert only a specific new version with certain parameters.
         
-        .html or .txt files that have the same filename as an archive (except for the file extension) will be used for release notes for that item.
+        .html, .md, or .txt files that have the same filename as an archive (except for the file extension) will be used for release notes for that item.
         For HTML release notes, if the contents of these files do not include a DOCTYPE or body tags, they will be treated as embedded CDATA release notes.
         Release notes for new items can be forced to be embedded by passing --embed-release-notes
         
-        For new update entries, Sparkle infers the minimum system OS requirement based on your update's LSMinimumSystemVersion provided
-        by your application's Info.plist. If none is found, \(programName) defaults to Sparkle's own minimum system requirement (macOS 10.13).
+        If appcast signing is required by any of the updates, the appcast and release note files may be updated for signing. If you make any manual modifications to the appcast or release note files, please re-run \(programName) to ensure all signatures are updated.
+        
+        For new update entries, Sparkle infers the minimum system OS and hardware requirements based on your update's bundle (e.g. via inspecting LSMinimumSystemVersion or detecting which architecture slices are available).
         
         An example of an archives directory may look like:
             ./my-app-release-zipfiles/
                 MyApp 1.0.zip
                 MyApp 1.0.html
-                MyApp 1.1.zip
-                MyApp 1.1.html
+                MyApp 1.1.dmg
+                MyApp 1.1.md
                 appcast.xml
                 \(oldFilesDirectoryName)/
                 
         EXAMPLES:
-            \(programNamePath) ./my-app-release-zipfiles/
-            \(programNamePath) -o appcast-name.xml ./my-app-release-zipfiles/
+            \(programNamePath) ./my-app-release-dmg-files/
+            \(programNamePath) -o appcast-name.xml ./my-app-release-dmg-files/
         
         For more advanced options that can be used for publishing updates, see https://sparkle-project.org/documentation/publishing/ for further documentation.
         
@@ -316,7 +323,7 @@ struct GenerateAppcast: ParsableCommand {
         }
         
         do {
-            let appcastsByFeed = try makeAppcasts(archivesSourceDir: archivesSourceDir, outputPathURL: outputPathURL, cacheDirectory: GenerateAppcast.cacheDirectory, keys: keys, versions: versions, maxVersionsPerBranchInFeed: maxVersionsPerBranchInFeed, newChannel: channel, majorVersion: majorVersion, maximumDeltas: maximumDeltas, deltaCompressionModeDescription: deltaCompression, deltaCompressionLevel: deltaCompressionLevel, disableNestedCodeCheck: disableNestedCodeCheck, downloadURLPrefix: downloadURLPrefix, releaseNotesURLPrefix: releaseNotesURLPrefix, verbose: verbose)
+            let appcastsByFeed = try makeAppcasts(archivesSourceDir: archivesSourceDir, outputPathURL: outputPathURL, cacheDirectory: GenerateAppcast.cacheDirectory, keys: keys, versions: versions, maxVersionsPerBranchInFeed: maxVersionsPerBranchInFeed, newChannel: channel, newMinimumUpdateVersion: minimumUpdateVersion, majorVersion: majorVersion, maximumDeltas: maximumDeltas, deltaCompressionModeDescription: deltaCompression, deltaCompressionLevel: deltaCompressionLevel, disableNestedCodeCheck: disableNestedCodeCheck, downloadURLPrefix: downloadURLPrefix, releaseNotesURLPrefix: releaseNotesURLPrefix, verbose: verbose)
             
             let oldFilesDirectory = archivesSourceDir.appendingPathComponent(GenerateAppcast.oldFilesDirectoryName)
             
@@ -329,7 +336,7 @@ struct GenerateAppcast: ParsableCommand {
                                                                 relativeTo: archivesSourceDir)
 
                 // Write the appcast
-                let (numNewUpdates, numExistingUpdates, numUpdatesRemoved) = try writeAppcast(appcastDestPath: appcastDestPath, appcast: appcast, fullReleaseNotesLink: fullReleaseNotesURL, preferToEmbedReleaseNotes: embedReleaseNotes, link: link, newChannel: channel, majorVersion: majorVersion, ignoreSkippedUpgradesBelowVersion: ignoreSkippedUpgradesBelowVersion, phasedRolloutInterval: phasedRolloutInterval, criticalUpdateVersion: criticalUpdateVersion, informationalUpdateVersions: informationalUpdateVersions)
+                let (numNewUpdates, numExistingUpdates, numUpdatesRemoved) = try writeAppcast(appcastDestPath: appcastDestPath, keys: keys, disableEmbeddedSignWarning: disableSigningWarning, appcast: appcast, fullReleaseNotesLink: fullReleaseNotesURL, preferToEmbedReleaseNotes: embedReleaseNotes, link: link, newChannel: channel, newMinimumUpdateVersion: minimumUpdateVersion, majorVersion: majorVersion, ignoreSkippedUpgradesBelowVersion: ignoreSkippedUpgradesBelowVersion, phasedRolloutInterval: phasedRolloutInterval, criticalUpdateVersion: criticalUpdateVersion, informationalUpdateVersions: informationalUpdateVersions)
 
                 // Inform the user, pluralizing "update" if necessary
                 let pluralizeUpdates = { pluralizeWord($0, "update") }

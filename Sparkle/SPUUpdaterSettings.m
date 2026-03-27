@@ -7,6 +7,7 @@
 //
 
 #import "SPUUpdaterSettings.h"
+#import "SPUUpdaterSettings+Debug.h"
 #import "SUHost.h"
 #import "SUConstants.h"
 
@@ -15,18 +16,28 @@
 
 static NSString *SUAutomaticallyChecksForUpdatesKeyPath = @"automaticallyChecksForUpdates";
 static NSString *SUUpdateCheckIntervalKeyPath = @"updateCheckInterval";
+static NSString *SUImpatientUpdateCheckIntervalKeyPath = @"impatientUpdateCheckInterval";
 static NSString *SUAutomaticallyDownloadsUpdatesKeyPath = @"automaticallyDownloadsUpdates";
 static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
+static NSString *SUAllowsAutomaticUpdatesOptionKeyPath = @"allowsAutomaticUpdatesOption";
+static NSString *SUAllowsAutomaticUpdatesKeyPath = @"allowsAutomaticUpdates";
 
 @implementation SPUUpdaterSettings
 {
     SUHost *_host;
+    
+#if DEBUG
+    BOOL _enableDebugUpdateCheckIntervals;
+#endif
 }
 
 @synthesize automaticallyChecksForUpdates = _automaticallyChecksForUpdates;
 @synthesize updateCheckInterval = _updateCheckInterval;
+@synthesize impatientUpdateCheckInterval = _impatientUpdateCheckInterval;
 @synthesize automaticallyDownloadsUpdates = _automaticallyDownloadsUpdates;
 @synthesize sendsSystemProfile = _sendsSystemProfile;
+@synthesize allowsAutomaticUpdatesOption = _allowsAutomaticUpdatesOption;
+@synthesize allowsAutomaticUpdates = _allowsAutomaticUpdates;
 
 - (instancetype)initWithHostBundle:(NSBundle *)hostBundle
 {
@@ -34,8 +45,17 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
     if (self != nil) {
         _host = [[SUHost alloc] initWithBundle:hostBundle];
         
+#if DEBUG
+        // This one must be checked first, before checking the other settings,
+        // since the others may rely on this
+        _enableDebugUpdateCheckIntervals = [self currentEnableDebugUpdateCheckIntervals];
+#endif
+        
         _automaticallyChecksForUpdates = [self currentAutomaticallyChecksForUpdates];
         _updateCheckInterval = [self currentUpdateCheckInterval];
+        _impatientUpdateCheckInterval = [self currentImpatientUpdateCheckInterval];
+        _allowsAutomaticUpdatesOption = [self currentAllowsAutomaticUpdatesOption];
+        _allowsAutomaticUpdates = [self currentAllowsAutomaticUpdates];
         _automaticallyDownloadsUpdates = [self currentAutomaticallyDownloadsUpdates];
         _sendsSystemProfile = [self currentSendsSystemProfile];
         
@@ -79,6 +99,9 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
         _automaticallyChecksForUpdates = currentValue;
         
         [self didChangeValueForKey:updatedKeyPath];
+        
+        [self processAllowsAutomaticUpdates];
+        [self processAutomaticallyDownloadsUpdates];
     }
 }
 
@@ -92,6 +115,51 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
         [self willChangeValueForKey:updatedKeyPath];
         
         _updateCheckInterval = currentValue;
+        
+        [self didChangeValueForKey:updatedKeyPath];
+    }
+}
+
+- (void)processImpatientUpdateCheckInterval SPU_OBJC_DIRECT
+{
+    NSTimeInterval currentValue = [self currentImpatientUpdateCheckInterval];
+    
+    if (fabs(currentValue - _impatientUpdateCheckInterval) >= 0.001) {
+        NSString *updatedKeyPath = SUImpatientUpdateCheckIntervalKeyPath;
+        
+        [self willChangeValueForKey:updatedKeyPath];
+        
+        _impatientUpdateCheckInterval = currentValue;
+        
+        [self didChangeValueForKey:updatedKeyPath];
+    }
+}
+
+- (void)processAllowsAutomaticUpdatesOption SPU_OBJC_DIRECT
+{
+    NSNumber *currentValue = [self currentAllowsAutomaticUpdatesOption];
+    
+    if (((currentValue != nil) != (_allowsAutomaticUpdatesOption != nil)) || (currentValue.boolValue != _allowsAutomaticUpdatesOption.boolValue)) {
+        NSString *updatedKeyPath = SUAllowsAutomaticUpdatesOptionKeyPath;
+        
+        [self willChangeValueForKey:updatedKeyPath];
+        
+        _allowsAutomaticUpdatesOption = currentValue;
+        
+        [self didChangeValueForKey:updatedKeyPath];
+    }
+}
+
+- (void)processAllowsAutomaticUpdates SPU_OBJC_DIRECT
+{
+    BOOL currentValue = [self currentAllowsAutomaticUpdates];
+    
+    if (currentValue != _allowsAutomaticUpdates) {
+        NSString *updatedKeyPath = SUAllowsAutomaticUpdatesKeyPath;
+        
+        [self willChangeValueForKey:updatedKeyPath];
+        
+        _allowsAutomaticUpdates = currentValue;
         
         [self didChangeValueForKey:updatedKeyPath];
     }
@@ -134,8 +202,17 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
         return;
     }
     
+#if DEBUG
+    // This one must be checked first, before checking the other settings,
+    // since the others may rely on this
+    _enableDebugUpdateCheckIntervals = [self currentEnableDebugUpdateCheckIntervals];
+#endif
+    
     [self processCurrentAutomaticallyChecksForUpdates];
     [self processUpdateCheckInterval];
+    [self processImpatientUpdateCheckInterval];
+    [self processAllowsAutomaticUpdatesOption];
+    [self processAllowsAutomaticUpdates];
     [self processAutomaticallyDownloadsUpdates];
     [self processSendsSystemProfile];
 }
@@ -161,10 +238,13 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
     // Hack to support backwards compatibility with older Sparkle versions, which supported
     // disabling updates by setting the check interval to 0.
     if (automaticallyCheckForUpdates && (NSInteger)[self currentUpdateCheckInterval] == 0) {
-        [self setUpdateCheckInterval:SUDefaultUpdateCheckInterval];
+        [self setUpdateCheckInterval:[self defaultUpdateCheckInterval]];
     } else {
         [NSNotificationCenter.defaultCenter postNotificationName:SUUpdateAutomaticCheckSettingChangedNotification object:nil userInfo:@{SUUpdateBundlePathUserInfoKey: _host.bundlePath}];
     }
+    
+    [self processAllowsAutomaticUpdates];
+    [self processAutomaticallyDownloadsUpdates];
 }
 
 + (BOOL)automaticallyNotifiesObserversOfAutomaticallyChecksForUpdates
@@ -175,12 +255,12 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
 - (NSTimeInterval)currentUpdateCheckInterval SPU_OBJC_DIRECT
 {
     // Find the stored check interval. User defaults override Info.plist.
-    id intervalValue = [_host objectForKey:SUScheduledCheckIntervalKey];
-    if (intervalValue == nil || ![(NSObject *)intervalValue isKindOfClass:[NSNumber class]]) {
-        return SUDefaultUpdateCheckInterval;
+    NSNumber *intervalValue = [_host doubleNumberForKey:SUScheduledCheckIntervalKey];
+    if (intervalValue == nil) {
+        return [self defaultUpdateCheckInterval];
     }
     
-    return [(NSNumber *)intervalValue doubleValue];
+    return intervalValue.doubleValue;
 }
 
 - (void)setUpdateCheckInterval:(NSTimeInterval)updateCheckInterval
@@ -199,27 +279,52 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
     }
 }
 
+- (NSTimeInterval)currentImpatientUpdateCheckInterval SPU_OBJC_DIRECT
+{
+    NSNumber *intervalValue = [_host doubleNumberForInfoDictionaryKey:SUScheduledImpatientCheckIntervalKey];
+    if (intervalValue == nil) {
+        return [self defaultImpatientUpdateCheckInterval];
+    }
+    
+    return intervalValue.doubleValue;
+}
+
 + (BOOL)automaticallyNotifiesObserversOfUpdateCheckInterval
 {
     return NO;
 }
 
-// For allowing automatic downloaded updates to be turned on or off
-- (NSNumber * _Nullable)allowsAutomaticUpdatesOption
++ (BOOL)automaticallyNotifiesObserversOfImpatientUpdateCheckInterval
 {
-    NSNumber *developerAllowsAutomaticUpdates = [_host objectForInfoDictionaryKey:SUAllowsAutomaticUpdatesKey];
-    return [developerAllowsAutomaticUpdates isKindOfClass:[NSNumber class]] ? developerAllowsAutomaticUpdates : nil;
+    return NO;
 }
 
-- (BOOL)allowsAutomaticUpdates
+- (NSNumber * _Nullable)currentAllowsAutomaticUpdatesOption SPU_OBJC_DIRECT
 {
-    NSNumber *developerAllowsAutomaticUpdates = [self allowsAutomaticUpdatesOption];
-    return (developerAllowsAutomaticUpdates == nil || developerAllowsAutomaticUpdates.boolValue);
+    NSNumber *developerAllowsAutomaticUpdates = [_host boolNumberForInfoDictionaryKey:SUAllowsAutomaticUpdatesKey];
+    return developerAllowsAutomaticUpdates;
 }
 
++ (BOOL)automaticallyNotifiesObserversOfAllowsAutomaticUpdatesOption
+{
+    return NO;
+}
+
+// This depends on currentAllowsAutomaticUpdatesOption and currentAutomaticallyChecksForUpdates and must be processed afterwards
+- (BOOL)currentAllowsAutomaticUpdates
+{
+    return (_allowsAutomaticUpdatesOption == nil) ? _automaticallyChecksForUpdates : _allowsAutomaticUpdatesOption.boolValue;
+}
+
++ (BOOL)automaticallyNotifiesObserversOfAllowsAutomaticUpdates
+{
+    return NO;
+}
+
+// This depends on currentAllowsAutomaticUpdates and must be processed afterwards
 - (BOOL)currentAutomaticallyDownloadsUpdates SPU_OBJC_DIRECT
 {
-    return [self allowsAutomaticUpdates] && [_host boolForKey:SUAutomaticallyUpdateKey];
+    return _allowsAutomaticUpdates && [_host boolForKey:SUAutomaticallyUpdateKey];
 }
 
 - (void)setAutomaticallyDownloadsUpdates:(BOOL)automaticallyDownloadsUpdates
@@ -259,6 +364,81 @@ static NSString *SUSendsSystemProfileKeyPath = @"sendsSystemProfile";
 + (BOOL)automaticallyNotifiesObserversOfSendsSystemProfile
 {
     return NO;
+}
+
+#if DEBUG
+// This is only used in DEBUG and is meant for the Sparkle Test App
+- (BOOL)currentEnableDebugUpdateCheckIntervals
+{
+    return [_host boolForInfoDictionaryKey:@"_SUEnableDebugUpdateCheckIntervals"];
+}
+#endif
+
+- (NSTimeInterval)minimumUpdateCheckInterval
+{
+#if DEBUG
+    if (_enableDebugUpdateCheckIntervals) {
+        // 1 minute
+        return 60;
+    }
+#endif
+    
+    // 1 hour
+    return (60 * 60);
+}
+
+- (uint64_t)leewayUpdateCheckInterval
+{
+#if DEBUG
+    if (_enableDebugUpdateCheckIntervals) {
+        // 1 second
+        return 1;
+    }
+#endif
+    
+    // 15 seconds
+    return 15;
+}
+
+- (NSTimeInterval)defaultUpdateCheckInterval SPU_OBJC_DIRECT
+{
+#if DEBUG
+    if (_enableDebugUpdateCheckIntervals) {
+        // 1 minute
+        return 60;
+    }
+#endif
+    
+    // 1 day
+    return (60 * 60 * 24);
+}
+
+// If the update has already been automatically downloaded, we normally don't want to bug the user about the update
+// However if the user has gone a very long time without quitting an application, we will notify them
+- (NSTimeInterval)defaultImpatientUpdateCheckInterval SPU_OBJC_DIRECT
+{
+#if DEBUG
+    if (_enableDebugUpdateCheckIntervals) {
+        // 2 minutes
+        return (60 * 2);
+    }
+#endif
+    
+    // 1 week
+    return (60 * 60 * 24 * 7);
+}
+
+- (NSTimeInterval)standardUIScheduledUpdateIdleEventLeewayInterval
+{
+#if DEBUG
+    if (_enableDebugUpdateCheckIntervals) {
+        // 30 seconds
+        return 30.0;
+    }
+#endif
+    
+    // 5 minutes
+    return (5 * 60.0);
 }
 
 @end

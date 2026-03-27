@@ -64,8 +64,7 @@ SUPublicKeysDefinitionAttribute
 @property (nonatomic, readonly) BOOL hasAnyKeys;
 
 - (instancetype)initWithEd:(NSString * _Nullable)ed
-                       dsa:(NSString * _Nullable)dsa
-;
+                       dsa:(NSString * _Nullable)dsa;
 
 @end
 

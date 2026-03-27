@@ -39,15 +39,24 @@ SUHostDefinitionAttribute
 @property (readonly, nonatomic, copy, nullable) NSString *publicDSAKeyFileKey;
 
 @property (nonatomic, readonly) BOOL hasUpdateSecurityPolicy;
+@property (nonatomic, readonly) BOOL requiresSignedAppcast;
 
-- (nullable id)objectForInfoDictionaryKey:(NSString *)key;
+- (nullable id)objectForInfoDictionaryKey:(NSString *)key ofClass:(Class)aClass;
+- (nullable NSNumber *)boolNumberForInfoDictionaryKey:(NSString *)key;
 - (BOOL)boolForInfoDictionaryKey:(NSString *)key;
-- (nullable id)objectForUserDefaultsKey:(NSString *)defaultName;
+- (nullable NSNumber *)doubleNumberForInfoDictionaryKey:(NSString *)key;
+
+- (nullable id)objectForUserDefaultsKey:(NSString *)defaultName ofClass:(Class)aClass;
 - (void)setObject:(nullable id)value forUserDefaultsKey:(NSString *)defaultName;
+- (nullable NSNumber *)boolNumberForUserDefaultsKey:(NSString *)key;
 - (BOOL)boolForUserDefaultsKey:(NSString *)defaultName;
 - (void)setBool:(BOOL)value forUserDefaultsKey:(NSString *)defaultName;
-- (nullable id)objectForKey:(NSString *)key;
+- (nullable NSNumber *)doubleNumberForUserDefaultsKey:(NSString *)key;
+
+- (nullable id)objectForKey:(NSString *)key ofClass:(Class)aClass;
+- (nullable NSNumber *)boolNumberForKey:(NSString *)key;
 - (BOOL)boolForKey:(NSString *)key;
+- (nullable NSNumber *)doubleNumberForKey:(NSString *)key;
 
 - (void)observeChangesFromUserDefaultKeys:(NSSet<NSString *> *)keyPaths changeHandler:(void (^)(NSString *))changeHandler;
 

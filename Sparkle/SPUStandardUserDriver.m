@@ -25,6 +25,9 @@
 #import "SPUStandardVersionDisplay.h"
 #import "SULog.h"
 #import "SPUNoUpdateFoundInfo.h"
+#import "SPUUpdaterSettings.h"
+#import "SPUUpdaterSettings+Debug.h"
+
 #include <time.h>
 #include <mach/mach_time.h>
 #import <IOKit/pwr_mgt/IOPMLib.h>
@@ -37,9 +40,6 @@
 - (void)activate;
 @end
 #endif
-
-// The amount of time the app is allowed to be idle for us to consider showing an update prompt right away when the app is active
-static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 30.0 : 5 * 60.0;
 
 @interface SPUStandardUserDriver () <SPUGentleUserDriverReminders>
 
@@ -65,6 +65,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     SUStatusController *_checkingController;
     
     SUUpdateAlert *_activeUpdateAlert;
+    SPUUpdaterSettings *_updaterSettings;
     
     SUStatusController *_statusController;
     SUUpdatePermissionPrompt *_permissionPrompt;
@@ -92,6 +93,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     self = [super init];
     if (self != nil) {
         _host = [[SUHost alloc] initWithBundle:hostBundle];
+        _updaterSettings = [[SPUUpdaterSettings alloc] initWithHostBundle:hostBundle];
         _oldHostName = _host.name;
         _oldHostBundleURL = hostBundle.bundleURL;
         _delegate = delegate;
@@ -110,7 +112,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
 - (double)currentTime SPU_OBJC_DIRECT
 {
     if (_timebaseInfo.denom > 0) {
-        return (1.0 * mach_absolute_time() * _timebaseInfo.numer / _timebaseInfo.denom);
+        return (double)(mach_absolute_time() * _timebaseInfo.numer) / (double)_timebaseInfo.denom;
     } else {
         return 0.0;
     }
@@ -218,7 +220,9 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
                 if (!appNearUpdaterInitialization && !backgroundApp) {
                     timeSinceLastEvent = CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateHIDSystemState, kCGAnyInputEventType);
                     
-                    if (timeSinceLastEvent >= SUScheduledUpdateIdleEventLeewayInterval) {
+                    NSTimeInterval scheduledUpdateIdleEventLeewayInterval = _updaterSettings.standardUIScheduledUpdateIdleEventLeewayInterval;
+                    
+                    if (timeSinceLastEvent >= scheduledUpdateIdleEventLeewayInterval) {
                         // Make sure there's no active power management assertions preventing
                         // the display from sleeping by the current application.
                         // If there is, then the app may still actively be in use
@@ -350,6 +354,10 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     
     [self closeCheckingWindow];
     
+    if (_activeUpdateAlert != nil) {
+        SULog(SULogLevelError, @"Error: -[%@ %@] should not be called when _activeUpdateAlert != nil:\n%@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), NSThread.callStackSymbols);
+    }
+    
     id<SPUStandardUserDriverDelegate> delegate = _delegate;
     id<SUVersionDisplay> customVersionDisplayer = nil;
     
@@ -363,7 +371,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     
     __weak __typeof__(self) weakSelf = self;
     __weak id<SPUStandardUserDriverDelegate> weakDelegate = delegate;
-    _activeUpdateAlert = [[SUUpdateAlert alloc] initWithAppcastItem:appcastItem state:state host:_host versionDisplayer:versionDisplayer completionBlock:^(SPUUserUpdateChoice choice, NSRect windowFrame, BOOL wasKeyWindow) {
+    _activeUpdateAlert = [[SUUpdateAlert alloc] initWithAppcastItem:appcastItem state:state host:_host versionDisplayer:versionDisplayer updaterSettings:_updaterSettings delegate:delegate completionBlock:^(SPUUserUpdateChoice choice, NSRect windowFrame, BOOL wasKeyWindow) {
         reply(choice);
         
         __typeof__(self) strongSelf = weakSelf;
@@ -453,7 +461,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     // I don't want to expose SULog here because it's more of a user driver facing error
     // For our purposes we just ignore it and continue on..
     NSLog(@"Failed to download release notes with error: %@", error);
-    [_activeUpdateAlert showReleaseNotesFailedToDownload];
+    [_activeUpdateAlert showReleaseNotesFailedToDownloadWithError:error];
 }
 
 - (void)showUpdateInFocus
@@ -691,6 +699,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
             }
             case SPUNoUpdateFoundReasonSystemIsTooOld:
             case SPUNoUpdateFoundReasonSystemIsTooNew:
+            case SPUNoUpdateFoundReasonHardwareDoesNotSupportARM64:
                 if (latestAppcastItem.infoURL != nil) {
                     // Show the user the product's link if available
                     [alert addButtonWithTitle:SULocalizedStringFromTableInBundle(@"Learn More…", SPARKLE_TABLE, sparkleBundle, nil)];
@@ -817,7 +826,7 @@ static const NSTimeInterval SUScheduledUpdateIdleEventLeewayInterval = DEBUG ? 3
     NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
 
-    if (_expectedContentLength > 0.0) {
+    if (_expectedContentLength > 0) {
         double newProgressValue = (double)_bytesDownloaded / (double)_expectedContentLength;
         
         [_statusController setProgressValue:MIN(newProgressValue, 1.0)];

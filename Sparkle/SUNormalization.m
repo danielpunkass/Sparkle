@@ -16,10 +16,10 @@ NSString *SUNormalizedInstallationPath(SUHost *host)
     NSBundle *bundle = host.bundle;
     assert(bundle != nil);
    
-    NSString * baseBundleName = [host objectForInfoDictionaryKey:@"SUBundleName"];
+    NSString * baseBundleName = [host objectForInfoDictionaryKey:@"SUBundleName" ofClass:NSString.class];
    
     if (baseBundleName == nil) {
-        baseBundleName = [host objectForInfoDictionaryKey:(__bridge NSString *)kCFBundleNameKey];
+        baseBundleName = [host objectForInfoDictionaryKey:(__bridge NSString *)kCFBundleNameKey ofClass:NSString.class];
     }
     
     NSString *normalizedAppPath = [[[bundle bundlePath] stringByDeletingLastPathComponent] stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.%@", baseBundleName, [[bundle bundlePath] pathExtension]]];

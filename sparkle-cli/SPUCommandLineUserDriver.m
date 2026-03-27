@@ -82,7 +82,7 @@
             NSData *descriptionData = [appcastItem.itemDescription dataUsingEncoding:NSUTF8StringEncoding];
             if (descriptionData != nil) {
                 NSString *itemDescriptionFormat = appcastItem.itemDescriptionFormat;
-                if (itemDescriptionFormat != nil && [itemDescriptionFormat isEqualToString:@"plain-text"]) {
+                if (itemDescriptionFormat != nil && ([itemDescriptionFormat isEqualToString:@"plain-text"] || [itemDescriptionFormat isEqualToString:@"markdown"])) {
                     [self displayPlainTextReleaseNotes:descriptionData encoding:NSUTF8StringEncoding];
                 } else {
                     [self displayHTMLReleaseNotes:descriptionData];
@@ -124,7 +124,9 @@
 - (void)showUpdateReleaseNotesWithDownloadData:(SPUDownloadData *)downloadData
 {
     if (_verbose) {
-        if (downloadData.MIMEType != nil && [downloadData.MIMEType isEqualToString:@"text/plain"]) {
+        NSString *MIMEType = downloadData.MIMEType;
+        NSString *fileExtension = downloadData.URL.pathExtension;
+        if ([MIMEType isEqualToString:@"text/plain"] || [MIMEType isEqualToString:@"text/markdown"] || [MIMEType isEqualToString:@"text/x-markdown"] || [fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame || [fileExtension caseInsensitiveCompare:@"md"] == NSOrderedSame || [fileExtension caseInsensitiveCompare:@"markdown"] == NSOrderedSame) {
             NSStringEncoding encoding;
             if (downloadData.textEncodingName == nil) {
                 encoding = NSUTF8StringEncoding;
@@ -187,7 +189,7 @@
     }
     
     if (_bytesToDownload > 0 && _verbose) {
-        NSString *currentProgressPercentage = [NSString stringWithFormat:@"%.0f%%", (_bytesDownloaded * 100.0 / _bytesToDownload)];
+        NSString *currentProgressPercentage = [NSString stringWithFormat:@"%.0f%%", ((double)_bytesDownloaded * 100.0 / (double)_bytesToDownload)];
         
         // Only report progress advancement when percentage significantly advances
         if (_lastProgressReported == nil || ![_lastProgressReported isEqualToString:currentProgressPercentage]) {

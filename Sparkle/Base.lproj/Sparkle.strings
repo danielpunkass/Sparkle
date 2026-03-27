@@ -10,6 +10,9 @@
 /* No comment provided by engineer. */
 "%1$@ %2$@ is available but your macOS version is too old to install it. At least macOS %3$@ is required." = "%1$@ %2$@ is available but your macOS version is too old to install it. At least macOS %3$@ is required.";
 
+/* Mac is too old and update requires Apple silicon Mac */
+"%1$@ %2$@ is available but this update requires a new Apple silicon Mac." = "%1$@ %2$@ is available but this update requires a new Apple silicon Mac.";
+
 /* No comment provided by engineer. */
 "%1$@ can’t be updated if it’s running from the location it was downloaded to." = "%1$@ can’t be updated when it’s running from the location it was downloaded to. This is due to a security limitation imposed by Apple for apps that are downloaded from the web.";
 
@@ -57,6 +60,9 @@
 
 /* No comment provided by engineer. */
 "An error occurred while downloading the update. Please try again later." = "An error occurred while downloading the update. Please try again later.";
+
+/* No comment provided by engineer. */
+"An error occurred while downloading the release notes." = "An error occurred while downloading the release notes.";
 
 /* No comment provided by engineer. */
 "An error occurred while extracting the archive. Please try again later." = "An error occurred while extracting the archive. Please try again later.";
@@ -121,9 +127,6 @@
 /* Take care not to overflow the status window. */
 "Installing update…" = "Installing update…";
 
-/* No comment provided by engineer. */
-"Interactive based packages cannot be installed as the root user." = "Interactive based packages cannot be installed as the root user.";
-
 /* Alternate title for 'Install Update' button when there's no download in RSS feed. */
 "Learn More…" = "Learn More…";
 
@@ -161,7 +164,13 @@
 "The installation failed due to not having permission to write the new update." = "The installation failed due to not having permission to write the new update.";
 
 /* No comment provided by engineer. */
-"The update checker failed to start correctly. You should contact the app developer to report this issue and verify that you have the latest version." = "The update checker failed to start correctly. You should contact the app developer to report this issue and verify that you have the latest version.";
+"The updater failed to start. Please verify you have the latest version of %@ and contact the app developer if the issue still persists. Check the Console logs for more information." = "The updater failed to start. Please verify you have the latest version of %@ and contact the app developer if the issue still persists. Check the Console logs for more information.";
+
+/* No comment provided by engineer. */
+"The update is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update is improperly signed and could not be validated. Please try again later or contact the app developer.";
+
+/* No comment provided by engineer. */
+"The update feed is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update feed is improperly signed and could not be validated. Please try again later or contact the app developer.";
 
 /* No comment provided by engineer. */
 "The update is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update is improperly signed and could not be validated. Please try again later or contact us.";
@@ -195,6 +204,9 @@
 
 /* No comment provided by engineer. */
 "Your macOS version is too old" = "Your macOS version is too old";
+
+/* Mac is too old and update requires newer hardware */
+"Your Mac is too old" = "Your Mac is too old";
 
 /* Status message shown when the user checks for updates but is already current or the feed doesn't contain any updates. */
 "You’re up to date!" = "You already have the latest version.";
