@@ -177,7 +177,8 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     [archive enumerateItems:^(SPUDeltaArchiveItem *item, BOOL *stop) {
         NSString *relativePath = item.relativeFilePath;
         
-        if ([relativePath.pathComponents containsObject:@".."]) {
+        NSArray<NSString *> *relativePathComponents = relativePath.pathComponents;
+        if ([relativePathComponents containsObject:@".."]) {
             if (error != NULL) {
                 *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Relative path '%@' contains '..' path component", relativePath] }];
             }
@@ -187,18 +188,40 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
         
         NSString *sourceFilePath = [source stringByAppendingPathComponent:relativePath];
         NSString *destinationFilePath = [destination stringByAppendingPathComponent:relativePath];
+        
         {
-            NSString *destinationParentDirectory = destinationFilePath.stringByDeletingLastPathComponent;
-            NSDictionary<NSFileAttributeKey, id> *destinationParentDirectoryAttributes = [fileManager attributesOfItemAtPath:destinationParentDirectory error:NULL];
-            
-            // It is OK for the directory parent to not exist if it has already been removed
-            if (destinationParentDirectoryAttributes != nil) {
-                // But if it does exist, make sure the entry in the parent directory we're looking at is good
-                // If it's inside a symlink, this is not good in any circumstance
-                NSString *fileType = destinationParentDirectoryAttributes[NSFileType];
-                if ([fileType isEqualToString:NSFileTypeSymbolicLink]) {
+            // Walk each intermediate directory component of relativePath, excluding the last component, and verify none are symlinks.
+            NSUInteger relativePathComponentCount = relativePathComponents.count;
+            NSString *cumulativePath = destination;
+            for (NSUInteger relativePathComponentIndex = 0; relativePathComponentIndex + 1 < relativePathComponentCount; relativePathComponentIndex++) {
+                cumulativePath = [cumulativePath stringByAppendingPathComponent:relativePathComponents[relativePathComponentIndex]];
+
+                char cumulativePathBuffer[PATH_MAX + 1] = {0};
+                if (![cumulativePath getFileSystemRepresentation:cumulativePathBuffer maxLength:PATH_MAX]) {
                     if (error != NULL) {
-                        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because '%@' cannot be a symbolic link.", destinationParentDirectory] }];
+                        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because '%@' cannot be converted to file system path.", cumulativePath] }];
+                    }
+                    *stop = YES;
+                    return;
+                }
+
+                struct stat cumulativePathStat = {0};
+                if (lstat(cumulativePathBuffer, &cumulativePathStat) != 0) {
+                    if (errno == ENOENT) {
+                        // Directory doesn't exist, so it can't be a symlink - safe to continue
+                        break;
+                    }
+                    
+                    if (error != NULL) {
+                        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because failed to stat '%@' with error: %d", cumulativePath, errno] }];
+                    }
+                    *stop = YES;
+                    return;
+                }
+                
+                if (S_ISLNK(cumulativePathStat.st_mode)) {
+                    if (error != NULL) {
+                        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because '%@' cannot contain a symbolic link in its intermediate path.", destinationFilePath.stringByDeletingLastPathComponent] }];
                     }
                     *stop = YES;
                     return;
