@@ -725,6 +725,9 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         if (strongSelf != nil) {
             [strongSelf _proceedWithUpdaterError:error acknowledgement:acknowledgement];
         }
+        else {
+            acknowledgement();
+        }
     } cancellation:^{
         acknowledgement();
     }];
