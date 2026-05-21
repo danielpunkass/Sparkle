@@ -41,6 +41,14 @@
 @end
 #endif
 
+// Buffer the "Checking for updates…" window so it doesn't flicker when a check
+// completes (or fails) almost immediately. We suppress the window entirely if a
+// result comes back inside SUCheckingWindowShowDelay seconds, and we enforce a
+// minimum visible duration of SUCheckingWindowMinDisplayTime seconds once it
+// has actually appeared on screen.
+static const NSTimeInterval SUCheckingWindowShowDelay = 0.3;
+static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
+
 @interface SPUStandardUserDriver () <SPUGentleUserDriverReminders>
 
 // Note: we expose a private interface for activeUpdateAlert property in SPUStandardUserDriver+Private.h as NSWindowController
@@ -77,11 +85,15 @@
     uint64_t _expectedContentLength;
     uint64_t _bytesDownloaded;
     double _timeSinceOpportuneUpdateNotice;
+    double _checkingWindowShownTime;
+    void (^_pendingPostCheckingCompletion)(void);
+    void (^_pendingPostCheckingCancellation)(void);
     
     BOOL _updateAlertWindowWasInactive;
     BOOL _loggedGentleUpdateReminderWarning;
     BOOL _regularApplicationUpdate;
     BOOL _updateReceivedUserAttention;
+    BOOL _checkingWindowPendingShow;
 }
 
 @synthesize activeUpdateAlert = _activeUpdateAlert;
@@ -352,8 +364,26 @@
 {
     assert(NSThread.isMainThread);
     
-    [self closeCheckingWindow];
+    [self _prepareUpdateFoundWithAppcastItem:appcastItem state:state reply:reply];
     
+    __weak __typeof__(self) weakSelf = self;
+    [self _transitionFromCheckingWindowWithCompletion:^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [strongSelf setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
+        }
+    } cancellation:^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [strongSelf->_activeUpdateAlert close];
+            strongSelf->_activeUpdateAlert = nil;
+        }
+        reply(SPUUserUpdateChoiceDismiss);
+    }];
+}
+
+- (void)_prepareUpdateFoundWithAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply SPU_OBJC_DIRECT
+{
     if (_activeUpdateAlert != nil) {
         SULog(SULogLevelError, @"Error: -[%@ %@] should not be called when _activeUpdateAlert != nil:\n%@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), NSThread.callStackSymbols);
     }
@@ -443,8 +473,6 @@
     if (state.userInitiated && [delegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
         [delegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
     }
-    
-    [self setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
 }
 
 - (void)showUpdateReleaseNotesWithDownloadData:(SPUDownloadData *)downloadData
@@ -477,6 +505,7 @@
         [_statusController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_checkingController != nil) {
+        [self _presentCheckingWindowIfPending];
         [_checkingController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_retryTerminatingApplication != nil) {
@@ -557,6 +586,29 @@
         [self _activateApplication];
     }
     
+    // Defer actually presenting the progress window until a minimum amount of time
+    // passes. This eliminates the potential for either a very brief flicker showing the
+    // window and then dismissing it, and of needing to show the window and then artificially
+    // sustain it for a long enough to avoid the flicker. See SUCheckingWindowShowDelay.
+    _checkingWindowPendingShow = YES;
+    _checkingWindowShownTime = 0.0;
+    SUStatusController *pendingController = _checkingController;
+    __weak __typeof__(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SUCheckingWindowShowDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil && strongSelf->_checkingController == pendingController) {
+            [strongSelf _presentCheckingWindowIfPending];
+        }
+    });
+}
+
+- (void)_presentCheckingWindowIfPending SPU_OBJC_DIRECT
+{
+    if (_checkingController == nil || !_checkingWindowPendingShow) {
+        return;
+    }
+    _checkingWindowPendingShow = NO;
+    _checkingWindowShownTime = [self currentTime];
     [_checkingController showWindow:self];
 }
 
@@ -568,10 +620,92 @@
         _checkingController = nil;
         _cancellation = nil;
     }
+    _checkingWindowPendingShow = NO;
+    _checkingWindowShownTime = 0.0;
+    _pendingPostCheckingCompletion = nil;
+    _pendingPostCheckingCancellation = nil;
+}
+
+- (BOOL)_finishPendingPostCheckingTransition SPU_OBJC_DIRECT
+{
+    void (^pendingCompletion)(void) = _pendingPostCheckingCompletion;
+    if (pendingCompletion == nil) {
+        return NO;
+    }
+
+    _pendingPostCheckingCompletion = nil;
+    _pendingPostCheckingCancellation = nil;
+    [self closeCheckingWindow];
+    pendingCompletion();
+    return YES;
+}
+
+- (BOOL)_cancelPendingPostCheckingTransition SPU_OBJC_DIRECT
+{
+    void (^pendingCancellation)(void) = _pendingPostCheckingCancellation;
+    if (pendingCancellation == nil) {
+        return NO;
+    }
+
+    _pendingPostCheckingCompletion = nil;
+    _pendingPostCheckingCancellation = nil;
+    [self closeCheckingWindow];
+    pendingCancellation();
+    return YES;
+}
+
+// Closes the "Checking for updates…" window and then invokes the completion.
+// If the checking window was never actually presented (because the buffered show
+// delay hadn't elapsed yet), the close happens immediately. If the window has been
+// shown for less than SUCheckingWindowMinDisplayTime, the close and the completion
+// are deferred until the minimum display time has elapsed so the window doesn't flicker.
+- (void)_transitionFromCheckingWindowWithCompletion:(void (^)(void))completion cancellation:(void (^)(void))cancellation SPU_OBJC_DIRECT
+{
+    if (_checkingController == nil) {
+        if (completion != nil) {
+            completion();
+        }
+        return;
+    }
+
+    if (_checkingWindowPendingShow) {
+        // The checking window never made it onto the screen — close silently and continue.
+        [self closeCheckingWindow];
+        if (completion != nil) {
+            completion();
+        }
+        return;
+    }
+
+    double elapsedSeconds = ([self currentTime] - _checkingWindowShownTime) / (double)NSEC_PER_SEC;
+    if (elapsedSeconds >= SUCheckingWindowMinDisplayTime) {
+        [self closeCheckingWindow];
+        if (completion != nil) {
+            completion();
+        }
+        return;
+    }
+
+    // Defer until the minimum display time has elapsed so the window doesn't flicker.
+    NSTimeInterval remainingSeconds = SUCheckingWindowMinDisplayTime - elapsedSeconds;
+    _pendingPostCheckingCompletion = [completion copy];
+    _pendingPostCheckingCancellation = [cancellation copy];
+    __weak __typeof__(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(remainingSeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        [strongSelf _finishPendingPostCheckingTransition];
+    });
 }
 
 - (void)cancelCheckForUpdates:(id)__unused sender
 {
+    if ([self _cancelPendingPostCheckingTransition]) {
+        return;
+    }
+
     if (_cancellation != nil) {
         _cancellation();
         _cancellation = nil;
@@ -585,8 +719,19 @@
 {
     assert(NSThread.isMainThread);
     
-    [self closeCheckingWindow];
+    __weak __typeof__(self) weakSelf = self;
+    [self _transitionFromCheckingWindowWithCompletion:^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [strongSelf _proceedWithUpdaterError:error acknowledgement:acknowledgement];
+        }
+    } cancellation:^{
+        acknowledgement();
+    }];
+}
     
+- (void)_proceedWithUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
+{
     [_statusController close];
     _statusController = nil;
     
@@ -619,8 +764,19 @@
 {
     assert(NSThread.isMainThread);
     
-    [self closeCheckingWindow];
+    __weak __typeof__(self) weakSelf = self;
+    [self _transitionFromCheckingWindowWithCompletion:^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [strongSelf _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
+        }
+    } cancellation:^{
+        acknowledgement();
+    }];
+}
     
+- (void)_proceedWithUpdateNotFoundWithError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
+{
     id <SPUStandardUserDriverDelegate> delegate = _delegate;
     
     id<SUVersionDisplay> customVersionDisplayer;
