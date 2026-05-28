@@ -724,8 +724,7 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         __typeof__(self) strongSelf = weakSelf;
         if (strongSelf != nil) {
             [strongSelf _proceedWithUpdaterError:error acknowledgement:acknowledgement];
-        }
-        else {
+        } else {
             acknowledgement();
         }
     } cancellation:^{
@@ -772,8 +771,7 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         __typeof__(self) strongSelf = weakSelf;
         if (strongSelf != nil) {
             [strongSelf _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
-        }
-        else {
+        } else {
             acknowledgement();
         }
     } cancellation:^{
