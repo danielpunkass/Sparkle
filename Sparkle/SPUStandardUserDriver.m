@@ -41,14 +41,6 @@
 @end
 #endif
 
-// Buffer the "Checking for updates…" window so it doesn't flicker when a check
-// completes (or fails) almost immediately. We suppress the window entirely if a
-// result comes back inside SUCheckingWindowShowDelay seconds, and we enforce a
-// minimum visible duration of SUCheckingWindowMinDisplayTime seconds once it
-// has actually appeared on screen.
-static const NSTimeInterval SUCheckingWindowShowDelay = 0.3;
-static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
-
 @interface SPUStandardUserDriver () <SPUGentleUserDriverReminders>
 
 // Note: we expose a private interface for activeUpdateAlert property in SPUStandardUserDriver+Private.h as NSWindowController
@@ -85,15 +77,11 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
     uint64_t _expectedContentLength;
     uint64_t _bytesDownloaded;
     double _timeSinceOpportuneUpdateNotice;
-    double _checkingWindowShownTime;
-    void (^_pendingPostCheckingCompletion)(void);
-    void (^_pendingPostCheckingCancellation)(void);
-    
+
     BOOL _updateAlertWindowWasInactive;
     BOOL _loggedGentleUpdateReminderWarning;
     BOOL _regularApplicationUpdate;
     BOOL _updateReceivedUserAttention;
-    BOOL _checkingWindowPendingShow;
 }
 
 @synthesize activeUpdateAlert = _activeUpdateAlert;
@@ -363,77 +351,84 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
 - (void)showUpdateFoundWithAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply
 {
     assert(NSThread.isMainThread);
-    
-    [self _prepareUpdateFoundWithAppcastItem:appcastItem state:state reply:reply];
-    
-    __weak __typeof__(self) weakSelf = self;
-    [self _transitionFromCheckingWindowWithCompletion:^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            [strongSelf setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
-        }
-    } cancellation:^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            [strongSelf->_activeUpdateAlert close];
-            strongSelf->_activeUpdateAlert = nil;
-        }
-        reply(SPUUserUpdateChoiceDismiss);
-    }];
-}
 
-- (void)_prepareUpdateFoundWithAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply SPU_OBJC_DIRECT
-{
     if (_activeUpdateAlert != nil) {
         SULog(SULogLevelError, @"Error: -[%@ %@] should not be called when _activeUpdateAlert != nil:\n%@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), NSThread.callStackSymbols);
     }
-    
+
+    _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
+
+    // For user initiated checks, let the delegate know we'll be showing an update.
+    // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this.
+    id<SPUStandardUserDriverDelegate> delegate = _delegate;
+    if (state.userInitiated && [delegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
+        [delegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
+    }
+
+    // Defer building the alert until the checking window has finished closing.
+    // This prevents _activeUpdateAlert and _checkingController being non-nil at
+    // the same time, which would make ordering of nil tests in ... fragile.
+    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
+        if (s != nil && !userCancelled) {
+            [s _buildActiveUpdateAlertForAppcastItem:appcastItem state:state reply:reply];
+            [s setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
+        } else {
+            // Either the driver was deallocated mid-flow or the user cancelled
+            // during the buffered close; in either case the updater is still
+            // waiting on reply. Dismiss so it can tear down cleanly.
+            reply(SPUUserUpdateChoiceDismiss);
+        }
+    }];
+}
+
+- (void)_buildActiveUpdateAlertForAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply SPU_OBJC_DIRECT
+{
     id<SPUStandardUserDriverDelegate> delegate = _delegate;
     id<SUVersionDisplay> customVersionDisplayer = nil;
-    
+
     if ([delegate respondsToSelector:@selector(standardUserDriverRequestsVersionDisplayer)]) {
         customVersionDisplayer = [delegate standardUserDriverRequestsVersionDisplayer];
     }
-    
+
     id<SUVersionDisplay> versionDisplayer = (customVersionDisplayer != nil) ? customVersionDisplayer : [SPUStandardVersionDisplay standardVersionDisplay];
-    
+
     BOOL needsToObserveUserAttention = [delegate respondsToSelector:@selector(standardUserDriverDidReceiveUserAttentionForUpdate:)];
-    
+
     __weak __typeof__(self) weakSelf = self;
     __weak id<SPUStandardUserDriverDelegate> weakDelegate = delegate;
     _activeUpdateAlert = [[SUUpdateAlert alloc] initWithAppcastItem:appcastItem state:state host:_host versionDisplayer:versionDisplayer updaterSettings:_updaterSettings delegate:delegate completionBlock:^(SPUUserUpdateChoice choice, NSRect windowFrame, BOOL wasKeyWindow) {
         reply(choice);
-        
+
         __typeof__(self) strongSelf = weakSelf;
-        
+
         if (strongSelf != nil) {
             if (needsToObserveUserAttention && !strongSelf->_updateReceivedUserAttention) {
                 strongSelf->_updateReceivedUserAttention = YES;
-                
+
                 id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                 // needsToObserveUserAttention already checks delegate responds to this selector
                 [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
             }
-            
+
             // Record the window frame of the update alert right before we deallocate it
             // So we can center future status window to where the update alert last was.
             // Also record if the window was inactive at the time a response was made
             // (the window may not be key if the window e.g. holds command while clicking on a response button)
             strongSelf->_updateAlertWindowFrameValue = [NSValue valueWithRect:windowFrame];
             strongSelf->_updateAlertWindowWasInactive = !wasKeyWindow;
-            
+
             strongSelf->_activeUpdateAlert = nil;
         }
     } didBecomeKeyBlock:^{
         if (!needsToObserveUserAttention) {
             return;
         }
-        
+
         if ([NSApp isActive]) {
             __typeof__(self) strongSelf = weakSelf;
             if (strongSelf != nil && !strongSelf->_updateReceivedUserAttention) {
                 strongSelf->_updateReceivedUserAttention = YES;
-                
+
                 id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                 // needsToObserveUserAttention already checks delegate responds to this selector
                 [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
@@ -441,7 +436,7 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         } else {
             // We need to listen for when the app becomes active again, and then test if the window alert
             // is still key. if it is, let the delegate know. Remove the observation after that.
-            
+
             __typeof__(self) strongSelfOuter = weakSelf;
             if (strongSelfOuter != nil && strongSelfOuter->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver == nil) {
                 strongSelfOuter->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver = [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidBecomeActiveNotification object:NSApp queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification * _Nonnull __unused note) {
@@ -449,15 +444,15 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
                     if (strongSelf != nil) {
                         if (!strongSelf->_updateReceivedUserAttention && [strongSelf->_activeUpdateAlert.window isKeyWindow]) {
                             strongSelf->_updateReceivedUserAttention = YES;
-                            
+
                             id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                             // needsToObserveUserAttention already checks delegate responds to this selector
                             [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
                         }
-                        
+
                         if (strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver != nil) {
                             [[NSNotificationCenter defaultCenter] removeObserver:strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver];
-                            
+
                             strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver = nil;
                         }
                     }
@@ -465,14 +460,6 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
             }
         }
     }];
-    
-    _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
-    
-    // For user initiated checks, let the delegate know we'll be showing an update
-    // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this
-    if (state.userInitiated && [delegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
-        [delegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
-    }
 }
 
 - (void)showUpdateReleaseNotesWithDownloadData:(SPUDownloadData *)downloadData
@@ -505,7 +492,6 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         [_statusController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_checkingController != nil) {
-        [self _presentCheckingWindowIfPending];
         [_checkingController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_retryTerminatingApplication != nil) {
@@ -585,132 +571,81 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
     if ([SUApplicationInfo isBackgroundApplication:[NSApplication sharedApplication]]) {
         [self _activateApplication];
     }
-    
-    // Defer actually presenting the progress window until a minimum amount of time
-    // passes. This eliminates the potential for either a very brief flicker showing the
-    // window and then dismissing it, and of needing to show the window and then artificially
-    // sustain it for a long enough to avoid the flicker. See SUCheckingWindowShowDelay.
-    _checkingWindowPendingShow = YES;
-    _checkingWindowShownTime = 0.0;
-    SUStatusController *pendingController = _checkingController;
-    __weak __typeof__(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SUCheckingWindowShowDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil && strongSelf->_checkingController == pendingController) {
-            [strongSelf _presentCheckingWindowIfPending];
-        }
-    });
-}
 
-- (void)_presentCheckingWindowIfPending SPU_OBJC_DIRECT
-{
-    if (_checkingController == nil || !_checkingWindowPendingShow) {
-        return;
-    }
-    _checkingWindowPendingShow = NO;
-    _checkingWindowShownTime = [self currentTime];
     [_checkingController showWindow:self];
 }
 
-- (void)closeCheckingWindow SPU_OBJC_DIRECT
+// Close the "Checking for updates…" window. If userCancelled is YES, this is
+// the user clicking Cancel: a pending buffered close (if any) is expedited
+// — its completion runs with userCancelled=YES, which lets each call site
+// skip the queued next-UI step while still signaling the updater to end its
+// session. If no buffered close is pending, the in-flight check is aborted via
+// _cancellation directly. If userCancelled is NO, this is the abort/teardown
+// path: the window is closed silently with no completion firing.
+- (void)closeCheckingWindow:(BOOL)userCancelled SPU_OBJC_DIRECT
 {
-    if (_checkingController != nil)
-    {
+    if (userCancelled) {
+        // closeImmediately closes the window regardless. Its return tells us
+        // whether a pending buffered completion fired (and did its own
+        // cleanup) or not — if not, we still need to abort the active check.
+        if ([_checkingController closeImmediately]) {
+            return;
+        }
+        if (_cancellation != nil) {
+            _cancellation();
+            _cancellation = nil;
+        }
+        _checkingController = nil;
+        return;
+    }
+    if (_checkingController != nil) {
         [_checkingController close];
         _checkingController = nil;
         _cancellation = nil;
     }
-    _checkingWindowPendingShow = NO;
-    _checkingWindowShownTime = 0.0;
-    _pendingPostCheckingCompletion = nil;
-    _pendingPostCheckingCancellation = nil;
-}
-
-- (BOOL)_finishPendingPostCheckingTransition SPU_OBJC_DIRECT
-{
-    void (^pendingCompletion)(void) = _pendingPostCheckingCompletion;
-    if (pendingCompletion == nil) {
-        return NO;
-    }
-
-    _pendingPostCheckingCompletion = nil;
-    _pendingPostCheckingCancellation = nil;
-    [self closeCheckingWindow];
-    pendingCompletion();
-    return YES;
-}
-
-- (BOOL)_cancelPendingPostCheckingTransition SPU_OBJC_DIRECT
-{
-    void (^pendingCancellation)(void) = _pendingPostCheckingCancellation;
-    if (pendingCancellation == nil) {
-        return NO;
-    }
-
-    _pendingPostCheckingCompletion = nil;
-    _pendingPostCheckingCancellation = nil;
-    [self closeCheckingWindow];
-    pendingCancellation();
-    return YES;
-}
-
-// Closes the "Checking for updates…" window and then invokes the completion.
-// If the checking window was never actually presented (because the buffered show
-// delay hadn't elapsed yet), the close happens immediately. If the window has been
-// shown for less than SUCheckingWindowMinDisplayTime, the close and the completion
-// are deferred until the minimum display time has elapsed so the window doesn't flicker.
-- (void)_transitionFromCheckingWindowWithCompletion:(void (^)(void))completion cancellation:(void (^)(void))cancellation SPU_OBJC_DIRECT
-{
-    if (_checkingController == nil) {
-        if (completion != nil) {
-            completion();
-        }
-        return;
-    }
-
-    if (_checkingWindowPendingShow) {
-        // The checking window never made it onto the screen — close silently and continue.
-        [self closeCheckingWindow];
-        if (completion != nil) {
-            completion();
-        }
-        return;
-    }
-
-    double elapsedSeconds = ([self currentTime] - _checkingWindowShownTime) / (double)NSEC_PER_SEC;
-    if (elapsedSeconds >= SUCheckingWindowMinDisplayTime) {
-        [self closeCheckingWindow];
-        if (completion != nil) {
-            completion();
-        }
-        return;
-    }
-
-    // Defer until the minimum display time has elapsed so the window doesn't flicker.
-    NSTimeInterval remainingSeconds = SUCheckingWindowMinDisplayTime - elapsedSeconds;
-    _pendingPostCheckingCompletion = [completion copy];
-    _pendingPostCheckingCancellation = [cancellation copy];
-    __weak __typeof__(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(remainingSeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf == nil) {
-            return;
-        }
-        [strongSelf _finishPendingPostCheckingTransition];
-    });
 }
 
 - (void)cancelCheckForUpdates:(id)__unused sender
 {
-    if ([self _cancelPendingPostCheckingTransition]) {
+    [self closeCheckingWindow:YES];
+}
+
+// Initiate closing the "Checking for updates…" window, waiting for any time-buffering
+// delay before continuing with the subsequent action. userCancelled is YES if
+// the user expedited the close by clicking Cancel during the buffered period.
+- (void)_closeCheckingWindowWithCompletionBlock:(void (^)(SPUStandardUserDriver * _Nullable s, BOOL userCancelled))completionBlock SPU_OBJC_DIRECT
+{
+    if (_checkingController == nil) {
+        completionBlock(self, NO);
         return;
     }
+    __weak __typeof__(self) weakSelf = self;
+    [_checkingController closeWithCompletionBlock:^(BOOL userCancelled) {
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            strongSelf->_checkingController = nil;
+            strongSelf->_cancellation = nil;
+        }
+        completionBlock(strongSelf, userCancelled);
+    }];
+}
 
-    if (_cancellation != nil) {
-        _cancellation();
-        _cancellation = nil;
+// Same as -_closeCheckingWindowWithCompletionBlock: but for the install/progress status
+// window. No `_cancellation` to clear on this path.
+- (void)_closeStatusWindowWithCompletionBlock:(void (^)(SPUStandardUserDriver * _Nullable s, BOOL userCancelled))completionBlock SPU_OBJC_DIRECT
+{
+    if (_statusController == nil) {
+        completionBlock(self, NO);
+        return;
     }
-    [self closeCheckingWindow];
+    __weak __typeof__(self) weakSelf = self;
+    [_statusController closeWithCompletionBlock:^(BOOL userCancelled) {
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            strongSelf->_statusController = nil;
+        }
+        completionBlock(strongSelf, userCancelled);
+    }];
 }
 
 #pragma mark Update Errors
@@ -718,29 +653,32 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
 - (void)showUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-    
-    __weak __typeof__(self) weakSelf = self;
-    [self _transitionFromCheckingWindowWithCompletion:^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            [strongSelf _proceedWithUpdaterError:error acknowledgement:acknowledgement];
+
+    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
+        if (s != nil && !userCancelled) {
+            [s _proceedWithUpdaterError:error acknowledgement:acknowledgement];
         } else {
             acknowledgement();
         }
-    } cancellation:^{
+    }];
+}
+
+- (void)_proceedWithUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
+{
+    [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
+        if (s != nil && !userCancelled) {
+            [s _showUpdaterErrorAlertForError:error];
+        }
         acknowledgement();
     }];
 }
-    
-- (void)_proceedWithUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
+
+- (void)_showUpdaterErrorAlertForError:(NSError *)error SPU_OBJC_DIRECT
 {
-    [_statusController close];
-    _statusController = nil;
-    
 #if SPARKLE_COPY_LOCALIZATIONS
     NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
-    
+
     // Ideally we should use -[NSAlert alertWithError:] however
     // unfortunately Sparkle may return error messages with descriptions that contain
     // recovery suggestions. So we will check if an explicit recovery suggestion exists,
@@ -755,27 +693,21 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         alert.messageText = SULocalizedStringFromTableInBundle(@"Update Error!", SPARKLE_TABLE, sparkleBundle, nil);
         alert.informativeText = error.localizedDescription;
     }
-    
+
     [alert addButtonWithTitle:SULocalizedStringFromTableInBundle(@"Cancel Update", SPARKLE_TABLE, sparkleBundle, nil)];
     [self showAlert:alert secondaryAction:nil];
-    
-    acknowledgement();
 }
 
 - (void)showUpdateNotFoundWithError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-    
-    __weak __typeof__(self) weakSelf = self;
-    [self _transitionFromCheckingWindowWithCompletion:^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            [strongSelf _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
+
+    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
+        if (s != nil && !userCancelled) {
+            [s _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
         } else {
             acknowledgement();
         }
-    } cancellation:^{
-        acknowledgement();
     }];
 }
     
@@ -927,7 +859,7 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         }
         
         _statusController = [[SUStatusController alloc] initWithHost:_host windowTitle:[NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"Updating %@", SPARKLE_TABLE, SUSparkleBundle(), nil), _host.name] centerPointValue:centerPointValue minimizable:minimizable closable:closable];
-        
+
         if (_updateAlertWindowWasInactive) {
             [_statusController.window orderFront:nil];
         } else {
@@ -957,10 +889,17 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
 
 - (void)cancelDownload:(id)__unused sender
 {
+    // closeImmediately closes the window regardless. Its return tells us
+    // whether a pending buffered completion fired (and did its own cleanup) or
+    // not — if not, we still need to invoke the active-download cancellation.
+    if ([_statusController closeImmediately]) {
+        return;
+    }
     if (_cancellation != nil) {
         _cancellation();
         _cancellation = nil;
     }
+    _statusController = nil;
 }
 
 - (void)showDownloadDidReceiveExpectedContentLength:(uint64_t)expectedContentLength
@@ -1033,55 +972,63 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
         // The "quit" event can always be canceled or delayed by the application we're updating
         // So we can't easily predict how long the installation will take or if it won't happen right away
         // We close our status window because we don't want it persisting for too long and have it obscure other windows
-        [_statusController close];
-        _statusController = nil;
-        
-        // Keep retry handler in case user tries to show update in focus again
-        _retryTerminatingApplication = [retryTerminatingApplication copy];
+        // The retry handler is assigned alongside the close completion so it
+        // never co-exists with _statusController.
+        void (^retry)(void) = [retryTerminatingApplication copy];
+        [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL __unused userCancelled) {
+            // userCancelled is ignored: the install is in flight regardless of
+            // what the user does about the visible status window, so the retry
+            // handler still needs to be available.
+            if (s != nil) {
+                s->_retryTerminatingApplication = retry;
+            }
+        }];
     }
 }
 
 - (void)showUpdateInstalledAndRelaunched:(BOOL)relaunched acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-    
-    // Close window showing update is installing
-    [_statusController close];
-    _statusController = nil;
-    
-    // Only show installed prompt when the app is not relaunched
-    // When the app is relaunched, there is enough of a UI from relaunching the app.
-    if (!relaunched) {
+
+    // Only show installed prompt when the app is not relaunched —
+    // when the app is relaunched, there is enough of a UI from relaunching the app.
+    [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
+        if (s != nil && !userCancelled && !relaunched) {
+            [s _showUpdateInstalledAlert];
+        }
+        acknowledgement();
+    }];
+}
+
+- (void)_showUpdateInstalledAlert SPU_OBJC_DIRECT
+{
 #if SPARKLE_COPY_LOCALIZATIONS
-        NSBundle *sparkleBundle = SUSparkleBundle();
+    NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = SULocalizedStringFromTableInBundle(@"Update Installed", SPARKLE_TABLE, sparkleBundle, nil);
         
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = SULocalizedStringFromTableInBundle(@"Update Installed", SPARKLE_TABLE, sparkleBundle, nil);
-        
-        // Extract information from newly updated bundle if available
-        NSString *hostName;
-        NSString *hostVersion;
-        NSBundle *newBundle = [NSBundle bundleWithURL:_oldHostBundleURL];
-        if (newBundle != nil) {
-            SUHost *newHost = [[SUHost alloc] initWithBundle:newBundle];
-            hostName = newHost.name;
-            hostVersion = newHost.displayVersion;
-        } else {
-            // This may happen if Sparkle's normalization is enabled
-            hostName = _oldHostName;
-            hostVersion = nil;
-        }
-        
-        if (hostVersion != nil) {
-            alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated to version %@!", SPARKLE_TABLE, sparkleBundle, nil), hostName, hostVersion];
-        } else {
-            alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated!", SPARKLE_TABLE, sparkleBundle, nil), hostName];
-        }
-        [self showAlert:alert secondaryAction:nil];
+    // Extract information from newly updated bundle if available
+    NSString *hostName;
+    NSString *hostVersion;
+    NSBundle *newBundle = [NSBundle bundleWithURL:_oldHostBundleURL];
+    if (newBundle != nil) {
+        SUHost *newHost = [[SUHost alloc] initWithBundle:newBundle];
+        hostName = newHost.name;
+        hostVersion = newHost.displayVersion;
+    } else {
+        // This may happen if Sparkle's normalization is enabled
+        hostName = _oldHostName;
+        hostVersion = nil;
     }
-    
-    acknowledgement();
+        
+    if (hostVersion != nil) {
+        alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated to version %@!", SPARKLE_TABLE, sparkleBundle, nil), hostName, hostVersion];
+    } else {
+        alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated!", SPARKLE_TABLE, sparkleBundle, nil), hostName];
+    }
+    [self showAlert:alert secondaryAction:nil];
 }
 
 #pragma mark Aborting Everything
@@ -1105,8 +1052,8 @@ static const NSTimeInterval SUCheckingWindowMinDisplayTime = 0.7;
     _cancellation = nil;
     _retryTerminatingApplication = nil;
     
-    [self closeCheckingWindow];
-    
+    [self closeCheckingWindow:NO];
+
     if (_permissionPrompt) {
         [_permissionPrompt close];
         _permissionPrompt = nil;
