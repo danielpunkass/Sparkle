@@ -77,7 +77,7 @@
     uint64_t _expectedContentLength;
     uint64_t _bytesDownloaded;
     double _timeSinceOpportuneUpdateNotice;
-
+    
     BOOL _updateAlertWindowWasInactive;
     BOOL _loggedGentleUpdateReminderWarning;
     BOOL _regularApplicationUpdate;
@@ -351,11 +351,11 @@
 - (void)showUpdateFoundWithAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply
 {
     assert(NSThread.isMainThread);
-
+    
     if (_activeUpdateAlert != nil) {
         SULog(SULogLevelError, @"Error: -[%@ %@] should not be called when _activeUpdateAlert != nil:\n%@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), NSThread.callStackSymbols);
     }
-
+    
     _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
 
     // For user initiated checks, let the delegate know we'll be showing an update.
@@ -385,50 +385,50 @@
 {
     id<SPUStandardUserDriverDelegate> delegate = _delegate;
     id<SUVersionDisplay> customVersionDisplayer = nil;
-
+    
     if ([delegate respondsToSelector:@selector(standardUserDriverRequestsVersionDisplayer)]) {
         customVersionDisplayer = [delegate standardUserDriverRequestsVersionDisplayer];
     }
-
+    
     id<SUVersionDisplay> versionDisplayer = (customVersionDisplayer != nil) ? customVersionDisplayer : [SPUStandardVersionDisplay standardVersionDisplay];
-
+    
     BOOL needsToObserveUserAttention = [delegate respondsToSelector:@selector(standardUserDriverDidReceiveUserAttentionForUpdate:)];
-
+    
     __weak __typeof__(self) weakSelf = self;
     __weak id<SPUStandardUserDriverDelegate> weakDelegate = delegate;
     _activeUpdateAlert = [[SUUpdateAlert alloc] initWithAppcastItem:appcastItem state:state host:_host versionDisplayer:versionDisplayer updaterSettings:_updaterSettings delegate:delegate completionBlock:^(SPUUserUpdateChoice choice, NSRect windowFrame, BOOL wasKeyWindow) {
         reply(choice);
-
+        
         __typeof__(self) strongSelf = weakSelf;
-
+        
         if (strongSelf != nil) {
             if (needsToObserveUserAttention && !strongSelf->_updateReceivedUserAttention) {
                 strongSelf->_updateReceivedUserAttention = YES;
-
+                
                 id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                 // needsToObserveUserAttention already checks delegate responds to this selector
                 [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
             }
-
+            
             // Record the window frame of the update alert right before we deallocate it
             // So we can center future status window to where the update alert last was.
             // Also record if the window was inactive at the time a response was made
             // (the window may not be key if the window e.g. holds command while clicking on a response button)
             strongSelf->_updateAlertWindowFrameValue = [NSValue valueWithRect:windowFrame];
             strongSelf->_updateAlertWindowWasInactive = !wasKeyWindow;
-
+            
             strongSelf->_activeUpdateAlert = nil;
         }
     } didBecomeKeyBlock:^{
         if (!needsToObserveUserAttention) {
             return;
         }
-
+        
         if ([NSApp isActive]) {
             __typeof__(self) strongSelf = weakSelf;
             if (strongSelf != nil && !strongSelf->_updateReceivedUserAttention) {
                 strongSelf->_updateReceivedUserAttention = YES;
-
+                
                 id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                 // needsToObserveUserAttention already checks delegate responds to this selector
                 [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
@@ -436,7 +436,7 @@
         } else {
             // We need to listen for when the app becomes active again, and then test if the window alert
             // is still key. if it is, let the delegate know. Remove the observation after that.
-
+            
             __typeof__(self) strongSelfOuter = weakSelf;
             if (strongSelfOuter != nil && strongSelfOuter->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver == nil) {
                 strongSelfOuter->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver = [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidBecomeActiveNotification object:NSApp queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification * _Nonnull __unused note) {
@@ -444,15 +444,15 @@
                     if (strongSelf != nil) {
                         if (!strongSelf->_updateReceivedUserAttention && [strongSelf->_activeUpdateAlert.window isKeyWindow]) {
                             strongSelf->_updateReceivedUserAttention = YES;
-
+                            
                             id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
                             // needsToObserveUserAttention already checks delegate responds to this selector
                             [strongDelegate standardUserDriverDidReceiveUserAttentionForUpdate:appcastItem];
                         }
-
+                        
                         if (strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver != nil) {
                             [[NSNotificationCenter defaultCenter] removeObserver:strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver];
-
+                            
                             strongSelf->_applicationBecameActiveAfterUpdateAlertBecameKeyObserver = nil;
                         }
                     }
@@ -571,7 +571,7 @@
     if ([SUApplicationInfo isBackgroundApplication:[NSApplication sharedApplication]]) {
         [self _activateApplication];
     }
-
+    
     [_checkingController showWindow:self];
 }
 
@@ -653,7 +653,7 @@
 - (void)showUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-
+    
     [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
         if (s != nil && !userCancelled) {
             [s _proceedWithUpdaterError:error acknowledgement:acknowledgement];
@@ -662,7 +662,7 @@
         }
     }];
 }
-
+    
 - (void)_proceedWithUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
 {
     [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
@@ -672,13 +672,13 @@
         acknowledgement();
     }];
 }
-
+    
 - (void)_showUpdaterErrorAlertForError:(NSError *)error SPU_OBJC_DIRECT
 {
 #if SPARKLE_COPY_LOCALIZATIONS
     NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
-
+    
     // Ideally we should use -[NSAlert alertWithError:] however
     // unfortunately Sparkle may return error messages with descriptions that contain
     // recovery suggestions. So we will check if an explicit recovery suggestion exists,
@@ -693,7 +693,7 @@
         alert.messageText = SULocalizedStringFromTableInBundle(@"Update Error!", SPARKLE_TABLE, sparkleBundle, nil);
         alert.informativeText = error.localizedDescription;
     }
-
+    
     [alert addButtonWithTitle:SULocalizedStringFromTableInBundle(@"Cancel Update", SPARKLE_TABLE, sparkleBundle, nil)];
     [self showAlert:alert secondaryAction:nil];
 }
@@ -701,7 +701,7 @@
 - (void)showUpdateNotFoundWithError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-
+    
     [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
         if (s != nil && !userCancelled) {
             [s _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
@@ -859,7 +859,7 @@
         }
         
         _statusController = [[SUStatusController alloc] initWithHost:_host windowTitle:[NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"Updating %@", SPARKLE_TABLE, SUSparkleBundle(), nil), _host.name] centerPointValue:centerPointValue minimizable:minimizable closable:closable];
-
+        
         if (_updateAlertWindowWasInactive) {
             [_statusController.window orderFront:nil];
         } else {
@@ -989,7 +989,7 @@
 - (void)showUpdateInstalledAndRelaunched:(BOOL)relaunched acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
-
+    
     // Only show installed prompt when the app is not relaunched —
     // when the app is relaunched, there is enough of a UI from relaunching the app.
     [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
@@ -999,13 +999,13 @@
         acknowledgement();
     }];
 }
-
+    
 - (void)_showUpdateInstalledAlert SPU_OBJC_DIRECT
 {
 #if SPARKLE_COPY_LOCALIZATIONS
     NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
-
+        
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = SULocalizedStringFromTableInBundle(@"Update Installed", SPARKLE_TABLE, sparkleBundle, nil);
         
@@ -1022,7 +1022,7 @@
         hostName = _oldHostName;
         hostVersion = nil;
     }
-        
+    
     if (hostVersion != nil) {
         alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated to version %@!", SPARKLE_TABLE, sparkleBundle, nil), hostName, hostVersion];
     } else {
@@ -1053,7 +1053,7 @@
     _retryTerminatingApplication = nil;
     
     [self closeCheckingWindow:NO];
-
+    
     if (_permissionPrompt) {
         [_permissionPrompt close];
         _permissionPrompt = nil;

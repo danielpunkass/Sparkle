@@ -39,7 +39,7 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
     NSString *_buttonTitle;
     SUHost *_host;
     NSButton *_touchBarButton;
-
+    
     IBOutlet NSButton *_actionButton;
     IBOutlet NSTextField *_statusTextField;
     IBOutlet NSProgressIndicator *_progressBar;
@@ -47,7 +47,7 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
     BOOL _waitingToShowWindow;
     NSTimeInterval _windowShownTime;
     void (^_pendingCloseCompletion)(BOOL userCancelled);
-
+    
     BOOL _minimizable;
     BOOL _closable;
 }
