@@ -358,19 +358,21 @@
     
     _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
 
-    // For user initiated checks, let the delegate know we'll be showing an update.
-    // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this.
-    id<SPUStandardUserDriverDelegate> delegate = _delegate;
-    if (state.userInitiated && [delegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
-        [delegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
-    }
-
     // Defer building the alert until the checking window has finished closing.
     // This prevents _activeUpdateAlert and _checkingController being non-nil at
     // the same time, which would make ordering of nil tests in ... fragile.
+    __weak id<SPUStandardUserDriverDelegate> weakDelegate = _delegate;
     [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
         if (s != nil && !userCancelled) {
             [s _buildActiveUpdateAlertForAppcastItem:appcastItem state:state reply:reply];
+
+            // For user initiated checks, let the delegate know we'll be showing an update.
+            // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this.
+            id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
+            if (state.userInitiated && [strongDelegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
+                [strongDelegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
+            }
+
             [s setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
         } else {
             // Either the driver was deallocated mid-flow or the user cancelled
