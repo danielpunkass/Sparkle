@@ -3257,7 +3257,7 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"$PROJECT_DIR/Configurations/link-tools.sh\"\n";
-            showEnvVarsInLog = 0;
+			showEnvVarsInLog = 0;
 		};
 		895C5DC524D78E460058A82D /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -3961,6 +3961,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 149B78631B7D3A0C00D7D62C /* ConfigCommonCoverage.xcconfig */;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 			};
 			name = Coverage;
 		};
@@ -4023,6 +4024,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = FA1941CF0D94A70100DD942E /* ConfigCommonDebug.xcconfig */;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 			};
 			name = Debug;
 		};
@@ -4030,6 +4032,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = FA1941CC0D94A70100DD942E /* ConfigCommonRelease.xcconfig */;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 			};
 			name = Release;
 		};
