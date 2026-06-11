@@ -45,8 +45,21 @@ SPARKLE_COPY_LOCALIZATIONS = 1
 // If SPARKLE_BUILD_PACKAGE_SUPPORT is set to 0, remove -DSPARKLE_BUILD_PACKAGE_SUPPORT
 OTHER_SWIFT_FLAGS_COMMON = -DSPARKLE_BUILD_LEGACY_DSA_SUPPORT -DGENERATE_APPCAST_BUILD_LEGACY_DSA_SUPPORT -DSPARKLE_BUILD_PACKAGE_SUPPORT
 
-// Minimum supported macOS version
-MACOSX_DEPLOYMENT_TARGET = 12.4
+// To faciliate development on a newer Xcode, we impose an actual and a
+// compatibility deployment target. For example this allows us to have all
+// our projects build against a 12.4 deployment target on Xcode 27, where
+// the minimum support target is 12.
+RS_ACTUAL_DEPLOYMENT_TARGET = 10.15.4
+RS_COMPATIBLE_DEPLOYMENT_TARGET = 12.4
+MACOSX_DEPLOYMENT_TARGET_COMPATIBILITY_ = $(RS_ACTUAL_DEPLOYMENT_TARGET)
+MACOSX_DEPLOYMENT_TARGET_COMPATIBILITY_YES = $(RS_COMPATIBLE_DEPLOYMENT_TARGET)
+RS_XCODE_SDK_ATLEAST_27_270000 = YES
+RS_XCODE_SDK_ATLEAST_27_280000 = YES
+RS_XCODE_SDK_ATLEAST_27_290000 = YES
+RS_XCODE_SDK_ATLEAST_27_300000 = YES
+
+// When reached more constants for SDKs should be added or we should reconsider need
+RS_XCODE_SDK_ATLEAST_27_EVALUTE_ONGOING_NEED_FOR_THIS = NO
 
 // Archs to use for Sparkle
 // You can change this for example to add arm64e or remove x86_64
