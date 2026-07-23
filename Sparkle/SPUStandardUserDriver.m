@@ -66,6 +66,13 @@
     
     SUUpdateAlert *_activeUpdateAlert;
     SPUUpdaterSettings *_updaterSettings;
+
+    // Release-notes presentation recorded while _activeUpdateAlert construction
+    // is deferred behind the checking window's buffered close. Replayed against
+    // the alert once it is built (see -_flushPendingReleaseNotes). A single
+    // block keeps the payload and its target selector inseparable so success and
+    // failure can't both be pending at once.
+    void (^_pendingReleaseNotesReplayBlock)(SUUpdateAlert *alert);
     
     SUStatusController *_statusController;
     SUUpdatePermissionPrompt *_permissionPrompt;
@@ -374,10 +381,22 @@
             }
 
             [s setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
+
+            // The alert's window is now loaded; replay any release-notes payload
+            // that arrived during the deferral so the pane doesn't spin forever.
+            [s _flushPendingReleaseNotes];
         } else {
             // Either the driver was deallocated mid-flow or the user cancelled
             // during the buffered close; in either case the updater is still
             // waiting on reply. Dismiss so it can tear down cleanly.
+            //
+            // The alert will never be built on this path, so nothing would ever
+            // replay a release-notes payload buffered during the deferral. Drop
+            // it here rather than relying on the later -dismissUpdateInstallation
+            // teardown, which clears it only by way of a non-local invariant.
+            if (s != nil) {
+                s->_pendingReleaseNotesReplayBlock = nil;
+            }
             reply(SPUUserUpdateChoiceDismiss);
         }
     }];
@@ -464,20 +483,57 @@
     }];
 }
 
+// Replay any release-notes payload that arrived while _activeUpdateAlert
+// construction was deferred behind the checking window's buffered close. Must
+// be called only after the alert's window has been loaded (e.g. after
+// -setUpActiveUpdateAlertForScheduledUpdate:state:), since -[SUUpdateAlert
+// showUpdateReleaseNotesWithDownloadData:] no-ops until the window is loaded.
+- (void)_flushPendingReleaseNotes SPU_OBJC_DIRECT
+{
+    if (_activeUpdateAlert == nil || _pendingReleaseNotesReplayBlock == nil) {
+        return;
+    }
+
+    void (^replayBlock)(SUUpdateAlert *) = _pendingReleaseNotesReplayBlock;
+    _pendingReleaseNotesReplayBlock = nil;
+    replayBlock(_activeUpdateAlert);
+}
+
 - (void)showUpdateReleaseNotesWithDownloadData:(SPUDownloadData *)downloadData
 {
     assert(NSThread.isMainThread);
-    
+
+    if (_activeUpdateAlert == nil) {
+        // The alert construction is deferred until the checking window's
+        // buffered close completes (see -showUpdateFoundWithAppcastItem:...).
+        // Record the payload and replay it once the alert exists, otherwise
+        // the release-notes pane spins indefinitely.
+        _pendingReleaseNotesReplayBlock = ^(SUUpdateAlert *alert) {
+            [alert showUpdateReleaseNotesWithDownloadData:downloadData];
+        };
+        return;
+    }
+
     [_activeUpdateAlert showUpdateReleaseNotesWithDownloadData:downloadData];
 }
 
 - (void)showUpdateReleaseNotesFailedToDownloadWithError:(NSError *)error
 {
     assert(NSThread.isMainThread);
-    
+
     // I don't want to expose SULog here because it's more of a user driver facing error
     // For our purposes we just ignore it and continue on..
     NSLog(@"Failed to download release notes with error: %@", error);
+
+    if (_activeUpdateAlert == nil) {
+        // See -showUpdateReleaseNotesWithDownloadData: — record until the
+        // deferred alert is built so the failure notice isn't dropped.
+        _pendingReleaseNotesReplayBlock = ^(SUUpdateAlert *alert) {
+            [alert showReleaseNotesFailedToDownloadWithError:error];
+        };
+        return;
+    }
+
     [_activeUpdateAlert showReleaseNotesFailedToDownloadWithError:error];
 }
 
@@ -1053,6 +1109,7 @@
     _installUpdateHandler = nil;
     _cancellation = nil;
     _retryTerminatingApplication = nil;
+    _pendingReleaseNotesReplayBlock = nil;
     
     [self closeCheckingWindow:NO];
     
