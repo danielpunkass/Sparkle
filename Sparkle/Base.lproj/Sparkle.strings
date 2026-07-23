@@ -164,6 +164,9 @@
 "The installation failed due to not having permission to write the new update." = "The installation failed due to not having permission to write the new update.";
 
 /* No comment provided by engineer. */
+"The release notes is improperly signed and could not be validated. Please contact the app developer for more information." = "The release notes is improperly signed and could not be validated. Please contact the app developer for more information.";
+
+/* No comment provided by engineer. */
 "The updater failed to start. Please verify you have the latest version of %@ and contact the app developer if the issue still persists. Check the Console logs for more information." = "The updater failed to start. Please verify you have the latest version of %@ and contact the app developer if the issue still persists. Check the Console logs for more information.";
 
 /* No comment provided by engineer. */
@@ -171,9 +174,6 @@
 
 /* No comment provided by engineer. */
 "The update feed is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update feed is improperly signed and could not be validated. Please try again later or contact the app developer.";
-
-/* No comment provided by engineer. */
-"The update is improperly signed and could not be validated. Please try again later or contact the app developer." = "The update is improperly signed and could not be validated. Please try again later or contact us.";
 
 /* No comment provided by engineer. */
 "Unable to Check For Updates" = "Unable to Check for Updates";
