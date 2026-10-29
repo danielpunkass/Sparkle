@@ -24,10 +24,11 @@
 // SPUInstallerProgressLocalizedStringsTable is generated at development time (by Configurations/generate_progress_tool_localizations.py)
 static NSDictionary<NSString *, NSString *> *SUBestMatchingInstallerProgressLocalizedStrings(void)
 {
-    NSArray<NSString *> *availableLocalizations = SPUInstallerProgressLocalizedStringsTable.allKeys;
+    NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *localizedStringsTable = SPUInstallerProgressLocalizedStringsTable();
+    NSArray<NSString *> *availableLocalizations = localizedStringsTable.allKeys;
     NSArray<NSString *> *preferredLocalizations = [NSBundle preferredLocalizationsFromArray:availableLocalizations];
     NSString *bestLocalization = preferredLocalizations.firstObject ?: @"en";
-    return SPUInstallerProgressLocalizedStringsTable[bestLocalization] ?: SPUInstallerProgressLocalizedStringsTable[@"en"];
+    return localizedStringsTable[bestLocalization] ?: localizedStringsTable[@"en"];
 }
 #endif
 

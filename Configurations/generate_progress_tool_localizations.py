@@ -97,7 +97,12 @@ def generate_header(localizations):
     lines.append("")
     lines.append("#import <Foundation/Foundation.h>")
     lines.append("")
-    lines.append("static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *const SPUInstallerProgressLocalizedStringsTable = @{")
+    # A function rather than a file-scope constant: clang only emits compile-time
+    # constant dictionary literals for macOS 11 and later deployment targets.
+    # The entries keep upstream's indentation so upstream string changes merge cleanly.
+    lines.append("static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *SPUInstallerProgressLocalizedStringsTable(void)")
+    lines.append("{")
+    lines.append("    return @{")
     for locale in sorted(localizations.keys()):
         lines.append('    @"%s": @{' % locale)
         for key in REQUIRED_KEYS:
@@ -106,7 +111,8 @@ def generate_header(localizations):
                 continue
             lines.append("        %s: %s," % (objc_string_literal(key), objc_string_literal(value)))
         lines.append("    },")
-    lines.append("};")
+    lines.append("    };")
+    lines.append("}")
     lines.append("")
     return "\n".join(lines)
 

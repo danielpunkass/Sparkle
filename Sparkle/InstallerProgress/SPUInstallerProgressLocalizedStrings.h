@@ -9,7 +9,9 @@
 
 #import <Foundation/Foundation.h>
 
-static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *const SPUInstallerProgressLocalizedStringsTable = @{
+static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *SPUInstallerProgressLocalizedStringsTable(void)
+{
+    return @{
     @"ar": @{
         @"Cancel Update": @"إلغاء التحديث",
         @"Updating %@": @"تحديث %@",
@@ -186,4 +188,5 @@ static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *const S
         @"Installing update…": @"正在安裝更新項目⋯",
         @"Updating %@": @"正在更新%@",
     },
-};
+    };
+}
