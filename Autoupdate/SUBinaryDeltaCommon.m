@@ -143,22 +143,6 @@ NSString *temporaryFilename(NSString *base)
     return stringWithFileSystemRepresentation(buffer);
 }
 
-NSString *temporaryDirectory(NSString *base)
-{
-    NSString *template = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.XXXXXXXXXX", base]];
-    NSMutableData *data = [NSMutableData data];
-    [data appendBytes:template.fileSystemRepresentation length:strlen(template.fileSystemRepresentation) + 1];
-
-    char *buffer = (char *)data.mutableBytes;
-    char *templateResult = mkdtemp(buffer);
-    if (templateResult == NULL) {
-        perror("mkdtemp");
-        return nil;
-    }
-
-    return stringWithFileSystemRepresentation(templateResult);
-}
-
 static void sha1HashOfBuffer(unsigned char *hash, const char *buffer, ssize_t bufferLength)
 {
     assert(bufferLength >= 0 && bufferLength <= UINT32_MAX);
@@ -453,14 +437,20 @@ extern NSString *hashOfTree(NSString *path)
     return hashOfTreeWithVersion(path, SUBinaryDeltaMajorVersionLatest);
 }
 
+BOOL fileExists(NSString *path)
+{
+    // Don't use fileExistsForPath: because it will try to follow symbolic links
+    struct stat fileInfo;
+    return lstat(path.fileSystemRepresentation, &fileInfo) == 0;
+}
+
 BOOL removeTree(NSString *path)
 {
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    // Don't use fileExistsForPath: because it will try to follow symbolic links
-    if (![fileManager attributesOfItemAtPath:path error:nil]) {
+    if (!fileExists(path)) {
         return YES;
     }
-    return [fileManager removeItemAtPath:path error:nil];
+    
+    return [NSFileManager.defaultManager removeItemAtPath:path error:nil];
 }
 
 BOOL copyTree(NSFileManager *fileManager, NSString *source, NSString *dest)

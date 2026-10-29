@@ -10,21 +10,21 @@ jobs:
   build:
     strategy:
       matrix:
-        xcode: ['xcode26.2', 'xcode16.4']
+        xcode: ['xcode26.6', 'xcode27.0']
         include:
-            - xcode: 'xcode16.4'
-              xcode-path: '/Applications/Xcode_16.4.app/Contents/Developer'
+            - xcode: 'xcode27.0'
+              xcode-path: '/Applications/Xcode_27.0.app/Contents/Developer'
               upload-dist: false
               run-analyzer: false
-              macos: 'macos-15'
-            - xcode: 'xcode26.2'
-              xcode-path: '/Applications/Xcode_26.2.app/Contents/Developer'
+              image: 'xcode-27'
+            - xcode: 'xcode26.6'
+              xcode-path: '/Applications/Xcode_26.6.app/Contents/Developer'
               upload-dist: true
               run-analyzer: true
-              macos: 'macos-26'
+              image: 'macos-26'
             
     name: Build and Test Sparkle
-    runs-on: ${{ matrix.macos }}
+    runs-on: ${{ matrix.image }}
 
     permissions:
       pull-requests: write
@@ -35,6 +35,15 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+      - name: Check Installer Progress localizations are up to date
+        if: ${{ matrix.upload-dist }}
+        run: |
+          python3 Configurations/generate_progress_tool_localizations.py
+          if [ -n "$(git status --porcelain -- Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h Sparkle/InstallerProgress/InstallerProgress-Info.plist)" ]; then
+            echo "::error::Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h or InstallerProgress-Info.plist is out of date. Run Configurations/generate_progress_tool_localizations.py and commit the result."
+            git diff -- Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h Sparkle/InstallerProgress/InstallerProgress-Info.plist
+            exit 1
+          fi
       - name: Build Unit Tests
         env:
           DEVELOPER_DIR: ${{ matrix.xcode-path }}
@@ -99,7 +108,7 @@ jobs:
           xcodebuild build -project Sparkle.xcodeproj -scheme Distribution -configuration Release -derivedDataPath build
       - name: Archive Test Results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-logs
           path: |
@@ -107,7 +116,7 @@ jobs:
             ~/Library/Logs/DiagnosticReports
       - name: Upload Distribution
         if: ${{ success() && matrix.upload-dist }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Sparkle-distribution-${{ matrix.xcode }}.tar.xz
           path: build/Build/Products/Release/sparkle_dist.tar.xz

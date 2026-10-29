@@ -11,7 +11,6 @@
 #import "SPUMessageTypes.h"
 #import "SULog.h"
 #import "SULog+NSError.h"
-#import "SUApplicationInfo.h"
 #import "SPUInstallerAgentProtocol.h"
 #import "SUInstallerAgentInitiationProtocol.h"
 #import "StatusInfo.h"
@@ -28,12 +27,6 @@
  * but should be low enough so that the user doesn't ponder why the updater hasn't finished terminating yet
  */
 static const NSTimeInterval SUTerminationTimeDelay = 0.3;
-
-#if __MAC_OS_X_VERSION_MAX_ALLOWED < 140000
-@interface NSApplication (ActivationAPIs)
-- (void)activate;
-@end
-#endif
 
 @interface InstallerProgressAppController () <NSApplicationDelegate, SPUInstallerAgentProtocol>
 @end
@@ -114,8 +107,6 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
         _application = application;
         _delegate = delegate;
         
-        [delegate loadLocalizationStringsFromHost:host];
-        
         _connection.exportedInterface = [NSXPCInterface interfaceWithProtocol:@protocol(SPUInstallerAgentProtocol)];
         _connection.exportedObject = self;
         
@@ -192,33 +183,17 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
     
     [_statusInfo invalidate];
     [_connection invalidate];
-    
-    // Remove the agent bundle; it is assumed this bundle is in a temporary/cache/support directory
-    NSError *theError = nil;
-    NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
-    
-    if (![[NSFileManager defaultManager] removeItemAtPath:bundlePath error:&theError]) {
-        SULog(SULogLevelError, @"Couldn't remove agent bundle: %@.", theError);
-    } else {
-        // There should be nothing else in the parent temporary directory given to us,
-        // so let us try to remove it. Note rmdir() will fail if there are unexpectably other
-        // items present
-        NSString *parentDirectory = bundlePath.stringByDeletingLastPathComponent;
-        const char *fileSystemRepresentation = parentDirectory.fileSystemRepresentation;
-        if (fileSystemRepresentation != NULL) {
-            if (rmdir(fileSystemRepresentation) != 0) {
-                SULog(SULogLevelError, @"Failed to remove parent agent bundle directory: %@: %d", parentDirectory, errno);
-            }
-        }
-    }
-    
+
     exit(status);
 }
 
 - (NSArray<NSRunningApplication *> *)runningApplicationsWithBundle:(NSBundle *)bundle SPU_OBJC_DIRECT
 {
-    // Resolve symlinks otherwise when we compare file paths, we may not realize two paths that are represented differently are the same
-    NSArray<NSString *> *bundlePathComponents = bundle.bundlePath.stringByResolvingSymlinksInPath.pathComponents;
+    // Resolve symlinks otherwise when we compare file paths, we may not realize two paths that are represented differently are the same.
+    // Make sure to use -[NSURL URLByResolvingSymlinksInPath] rather than -[NSString stringByResolvingSymlinksInPath]
+    // because the former will normalize it to proper file system representation.
+    // This is also done when retrieving NSRunningApplication path further below
+    NSArray<NSString *> *bundlePathComponents = bundle.bundleURL.URLByResolvingSymlinksInPath.pathComponents;
     NSString *bundleIdentifier = bundle.bundleIdentifier;
     
     NSMutableArray<NSRunningApplication *> *matchedRunningApplications = [[NSMutableArray alloc] init];
@@ -231,7 +206,7 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
         NSMutableArray<NSRunningApplication *> *potentialMatchingTranslocatedRunningApplications = [[NSMutableArray alloc] init];
         
         BOOL needsToHandleImproperBundles;
-        if (@available(macOS 16, *)) {
+        if (@available(macOS 26, *)) {
             needsToHandleImproperBundles = NO;
         } else {
             needsToHandleImproperBundles = YES;
@@ -443,19 +418,9 @@ static const NSTimeInterval SUTerminationTimeDelay = 0.3;
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self->_willTerminate) {
-            // Show app icon in the dock
-            ProcessSerialNumber psn = { 0, kCurrentProcess };
-            TransformProcessType(&psn, kProcessTransformToForegroundApplication);
-            
-            // Note: the application icon needs to be set after showing the icon in the dock
-            self->_application.applicationIconImage = [SUApplicationInfo bestIconForHost:self->_oldHost];
-            
             // Activate ourselves otherwise we will probably be in the background
-            if (@available(macOS 14, *)) {
-                [self->_application activate];
-            } else {
-                [self->_application activateIgnoringOtherApps:YES];
-            }
+            // See comments in -[SPUStandardUserDriver _activateApplication] for why -activate is not used
+            [self->_application activateIgnoringOtherApps:YES];
             
             [self->_delegate installerProgressShouldDisplayWithHost:self->_oldHost];
         }

@@ -1009,12 +1009,17 @@ class SUAppcastTest: XCTestCase {
             let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
             let items = appcast.items
 
-            XCTAssertEqual(2, items.count)
+            XCTAssertEqual(4, items.count)
 
             XCTAssertEqual("Version 2.0", items[1].title)
             XCTAssertEqual("desc", items[1].itemDescription)
             XCTAssertNotNil(items[0].releaseNotesURL)
             XCTAssertEqual("https://sparkle-project.org/#works", items[0].releaseNotesURL!.absoluteString)
+
+            // Child elements of <sparkle:informationalUpdate> and <sparkle:tags> must be
+            // resolved through the namespace URI too, not through their qualified name
+            XCTAssertFalse(items[2].isInformationOnlyUpdate)
+            XCTAssertTrue(items[3].isCriticalUpdate)
         } catch let err as NSError {
             NSLog("%@", err)
             XCTFail(err.localizedDescription)
@@ -1037,12 +1042,14 @@ class SUAppcastTest: XCTestCase {
             
             // Test https
             XCTAssertEqual("https://sparkle-project.org/notes/relnote-3.0.txt", items[0].releaseNotesURL?.absoluteString)
+            XCTAssertEqual(1234, items[0].releaseNotesContentLength)
             XCTAssertEqual("https://sparkle-project.org/fullnotes.txt", items[0].fullReleaseNotesURL?.absoluteString)
             XCTAssertEqual("https://sparkle-project.org", items[0].infoURL?.absoluteString)
             XCTAssertEqual("https://sparkle-project.org/release-3.0.zip", items[0].fileURL?.absoluteString)
             
             // Test http
             XCTAssertEqual("http://sparkle-project.org/notes/relnote-2.0.txt", items[1].releaseNotesURL?.absoluteString)
+            XCTAssertEqual(0, items[1].releaseNotesContentLength)
             XCTAssertEqual("http://sparkle-project.org/fullnotes.txt", items[1].fullReleaseNotesURL?.absoluteString)
             XCTAssertEqual("http://sparkle-project.org", items[1].infoURL?.absoluteString)
             XCTAssertEqual("http://sparkle-project.org/release-2.0.zip", items[1].fileURL?.absoluteString)
@@ -1161,6 +1168,44 @@ class SUAppcastTest: XCTestCase {
         } catch let err as NSError {
             NSLog("Expected error: %@", err)
             XCTFail("Appcast creation should have passed when encountering dangerous link of one item")
+        }
+    }
+
+    func testPackageInstallAllowedWithSkippedSigningValidation() {
+        let testFile = Bundle(for: SUAppcastTest.self).path(forResource: "test-package-update", ofType: "xml")!
+        let testData = NSData(contentsOfFile: testFile)!
+
+        do {
+            let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
+
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .skipped)
+
+            XCTAssertEqual(appcast.items.count, 2)
+            XCTAssertEqual(appcast.items[0].installationType, SPUInstallationTypeGuidedPackage)
+            XCTAssertEqual(appcast.items[1].installationType, SPUInstallationTypeApplication)
+        } catch let err as NSError {
+            NSLog("Unexpected error: %@", err)
+            XCTFail("Appcast creation should have passed when signing validation is skipped")
+        }
+    }
+
+    func testPackageInstallRejectedWithFailedSigningValidation() {
+        let testFile = Bundle(for: SUAppcastTest.self).path(forResource: "test-package-update", ofType: "xml")!
+        let testData = NSData(contentsOfFile: testFile)!
+
+        do {
+            let stateResolver = SPUAppcastItemStateResolver(hostVersion: "1.0", applicationVersionComparator: SUStandardVersionComparator.default, standardVersionComparator: SUStandardVersionComparator.default)
+
+            let appcast = try SUAppcast(xmlData: testData as Data, relativeTo: nil, stateResolver: stateResolver, signingValidationStatus: .failed)
+
+            // The package-based item should be rejected because signing validation on the feed failed;
+            // only the application-based item should remain
+            XCTAssertEqual(appcast.items.count, 1)
+            XCTAssertEqual(appcast.items[0].installationType, SPUInstallationTypeApplication)
+            XCTAssertEqual(appcast.items[0].versionString, "1.0")
+        } catch let err as NSError {
+            NSLog("Unexpected error: %@", err)
+            XCTFail("Appcast creation should have passed, dropping only the rejected package item")
         }
     }
 }

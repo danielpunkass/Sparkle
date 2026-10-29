@@ -41,17 +41,6 @@
 @end
 #endif
 
-// Note: we don't want to directly pull in AppKit here especially if the main application does not need it
-@interface NSObject (ActivationAPIs)
-// NSApplication
-+ (id)sharedApplication;
-- (void)yieldActivationToApplication:(id)application;
-
-// NSRunningApplication
-+ (NSArray *)runningApplicationsWithBundleIdentifier:(NSString *)bundleIdentifier;
-- (NSURL *)bundleURL;
-@end
-
 @interface SPUInstallerDriver () <SUInstallerCommunicationProtocol>
 @end
 
@@ -73,7 +62,6 @@
     SPUInstallerMessageType _currentStage;
     NSUInteger _extractionAttempts;
     
-    BOOL _postponedOnce;
     BOOL _relaunch;
     BOOL _systemDomain;
     BOOL _aborted;
@@ -498,8 +486,8 @@
 
                     // Send a probe/ping to the status service, which should boost/prioritize its startup
                     if (hostBundleIdentifier != nil) {
-                        [SPUProbeInstallStatus probeInstallerInProgressForHostBundleIdentifier:hostBundleIdentifier completion:^(BOOL stausServiceIsRunning) {
-                            if (!stausServiceIsRunning) {
+                        [SPUProbeInstallStatus probeInstallerInProgressForHostBundleIdentifier:hostBundleIdentifier completion:^(BOOL statusServiceIsRunning) {
+                            if (!statusServiceIsRunning) {
                                 SULog(SULogLevelError, @"Error: failed to probe status service for %@ from the framework", hostBundleIdentifier);
                             }
                         }];
@@ -521,30 +509,29 @@
 {
     assert(_updateItem);
     
-    id<SPUInstallerDriverDelegate> delegate = _delegate;
-    
     if (![self mayUpdateAndRestart])
     {
-        [delegate installerIsRequestingAbortInstallWithError:nil];
+        [_delegate installerIsRequestingAbortInstallWithError:nil];
         return;
     }
     
     // Give the host app an opportunity to postpone the install and relaunch.
-    if (!_postponedOnce)
-    {
-        id updater = _updater;
-        id<SPUUpdaterDelegate> updaterDelegate = _updaterDelegate;
-        if (updater != nil && [updaterDelegate respondsToSelector:@selector(updater:shouldPostponeRelaunchForUpdate:untilInvokingBlock:)]) {
-            _postponedOnce = YES;
-            __weak __typeof__(self) weakSelf = self;
-            if ([updaterDelegate updater:updater shouldPostponeRelaunchForUpdate:_updateItem untilInvokingBlock:^{
-                [weakSelf installWithToolAndRelaunch:relaunch displayingUserInterface:showUI];
-            }]) {
-                return;
-            }
+    id updater = _updater;
+    id<SPUUpdaterDelegate> updaterDelegate = _updaterDelegate;
+    if (updater != nil && [updaterDelegate respondsToSelector:@selector(updater:shouldPostponeRelaunchForUpdate:untilInvokingBlock:)]) {
+        __weak __typeof__(self) weakSelf = self;
+        if ([updaterDelegate updater:updater shouldPostponeRelaunchForUpdate:_updateItem untilInvokingBlock:^{
+            [weakSelf _installWithToolAndRelaunch:relaunch displayingUserInterface:showUI];
+        }]) {
+            return;
         }
     }
     
+    [self _installWithToolAndRelaunch:relaunch displayingUserInterface:showUI];
+}
+
+- (void)_installWithToolAndRelaunch:(BOOL)relaunch displayingUserInterface:(BOOL)showUI SPU_OBJC_DIRECT
+{
     if (_updateWillInstallHandler != NULL) {
         _updateWillInstallHandler();
     }
@@ -557,51 +544,11 @@
     
     _relaunch = relaunch;
     
-    // If AppKit is loaded, we will yield to our Sparkle progress app
-    // This will let the system know it should be okay for the progress agent to activate itself (if necessary)
-    // Note we don't want to directly pull in AppKit here especially if the main application does not need it
-    if (showUI) {
-        if (@available(macOS 14, *)) {
-            // Make sure we are not root before using AppKit API
-            if (geteuid() != 0) {
-                Class applicationClass = NSClassFromString(@"NSApplication");
-                if ([applicationClass respondsToSelector:@selector(sharedApplication)]) {
-                    NSObject *application = [applicationClass sharedApplication];
-                    
-                    if ([application respondsToSelector:@selector(yieldActivationToApplication:)]) {
-                        Class runningApplicationClass = NSClassFromString(@"NSRunningApplication");
-                        if ([runningApplicationClass respondsToSelector:@selector(runningApplicationsWithBundleIdentifier:)]) {
-                            NSArray *runningApplications = [runningApplicationClass runningApplicationsWithBundleIdentifier:@SPARKLE_INSTALLER_PROGRESS_TOOL_BUNDLE_ID];
-                            
-                            NSString *hostBundleIdentifier = _host.bundle.bundleIdentifier;
-                            
-                            id targetRunningApplication = nil;
-                            for (id runningApplication in runningApplications) {
-                                if ([(NSObject *)runningApplication respondsToSelector:@selector(bundleURL)]) {
-                                    NSURL *bundleURL = [(NSObject *)runningApplication bundleURL];
-                                    
-                                    if (hostBundleIdentifier != nil && [bundleURL.pathComponents containsObject:hostBundleIdentifier]) {
-                                        targetRunningApplication = runningApplication;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (targetRunningApplication != nil) {
-                                [application yieldActivationToApplication:targetRunningApplication];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
     // The user can request trying to relaunch/quit the app multiple times
     // Avoid re-notifying the delegate twice
     if (!_notifiedDelegateInstallationWillFinish) {
         _notifiedDelegateInstallationWillFinish = YES;
-        [delegate installerWillFinishInstallationAndRelaunch:relaunch];
+        [_delegate installerWillFinishInstallationAndRelaunch:relaunch];
     }
     
     uint8_t response[2] = {(uint8_t)relaunch, (uint8_t)showUI};

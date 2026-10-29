@@ -35,11 +35,8 @@
 
 #import <AppKit/AppKit.h>
 
-#if __MAC_OS_X_VERSION_MAX_ALLOWED < 140000
-@interface NSApplication (ActivationAPIs)
-- (void)activate;
-@end
-#endif
+// Delay before we need to show the checking for updates progress window when user initiates an update check
+static const NSTimeInterval SUShowCheckingForUpdatesTimeDelay = 0.3;
 
 @interface SPUStandardUserDriver () <SPUGentleUserDriverReminders>
 
@@ -63,16 +60,10 @@
     id<NSObject> _applicationBecameActiveAfterUpdateAlertBecameKeyObserver;
     NSValue *_updateAlertWindowFrameValue;
     SUStatusController *_checkingController;
+    dispatch_block_t _showCheckingControllerWindowDelayBlock;
     
     SUUpdateAlert *_activeUpdateAlert;
     SPUUpdaterSettings *_updaterSettings;
-
-    // Release-notes presentation recorded while _activeUpdateAlert construction
-    // is deferred behind the checking window's buffered close. Replayed against
-    // the alert once it is built (see -_flushPendingReleaseNotes). A single
-    // block keeps the payload and its target selector inseparable so success and
-    // failure can't both be pending at once.
-    void (^_pendingReleaseNotesReplayBlock)(SUUpdateAlert *alert);
     
     SUStatusController *_statusController;
     SUUpdatePermissionPrompt *_permissionPrompt;
@@ -135,11 +126,10 @@
 
 - (void)_activateApplication SPU_OBJC_DIRECT
 {
-    if (@available(macOS 14, *)) {
-        [NSApp activate];
-    } else {
-        [NSApp activateIgnoringOtherApps:YES];
-    }
+    // -[NSApp activate] does not always work reliably from backgrounded apps when the user initiates checks for updates
+    // from e.g. a menu bar. The OS should grant active focus to the appliation, but it is inconsistent (last tested on 26.5.1).
+    // For now we will prefer the deprecated more reliant API
+    [NSApp activateIgnoringOtherApps:YES];
 }
 
 - (void)showUpdatePermissionRequest:(SPUUpdatePermissionRequest *)request reply:(void (^)(SUUpdatePermissionResponse *))reply
@@ -359,51 +349,12 @@
 {
     assert(NSThread.isMainThread);
     
+    [self closeCheckingWindow];
+    
     if (_activeUpdateAlert != nil) {
         SULog(SULogLevelError, @"Error: -[%@ %@] should not be called when _activeUpdateAlert != nil:\n%@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), NSThread.callStackSymbols);
     }
     
-    _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
-
-    // Defer building the alert until the checking window has finished closing.
-    // This prevents _activeUpdateAlert and _checkingController being non-nil at
-    // the same time, which would make ordering of nil tests in ... fragile.
-    __weak id<SPUStandardUserDriverDelegate> weakDelegate = _delegate;
-    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
-        if (s != nil && !userCancelled) {
-            [s _buildActiveUpdateAlertForAppcastItem:appcastItem state:state reply:reply];
-
-            // For user initiated checks, let the delegate know we'll be showing an update.
-            // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this.
-            id<SPUStandardUserDriverDelegate> strongDelegate = weakDelegate;
-            if (state.userInitiated && [strongDelegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
-                [strongDelegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
-            }
-
-            [s setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
-
-            // The alert's window is now loaded; replay any release-notes payload
-            // that arrived during the deferral so the pane doesn't spin forever.
-            [s _flushPendingReleaseNotes];
-        } else {
-            // Either the driver was deallocated mid-flow or the user cancelled
-            // during the buffered close; in either case the updater is still
-            // waiting on reply. Dismiss so it can tear down cleanly.
-            //
-            // The alert will never be built on this path, so nothing would ever
-            // replay a release-notes payload buffered during the deferral. Drop
-            // it here rather than relying on the later -dismissUpdateInstallation
-            // teardown, which clears it only by way of a non-local invariant.
-            if (s != nil) {
-                s->_pendingReleaseNotesReplayBlock = nil;
-            }
-            reply(SPUUserUpdateChoiceDismiss);
-        }
-    }];
-}
-
-- (void)_buildActiveUpdateAlertForAppcastItem:(SUAppcastItem *)appcastItem state:(SPUUserUpdateState *)state reply:(void (^)(SPUUserUpdateChoice))reply SPU_OBJC_DIRECT
-{
     id<SPUStandardUserDriverDelegate> delegate = _delegate;
     id<SUVersionDisplay> customVersionDisplayer = nil;
     
@@ -481,59 +432,32 @@
             }
         }
     }];
-}
-
-// Replay any release-notes payload that arrived while _activeUpdateAlert
-// construction was deferred behind the checking window's buffered close. Must
-// be called only after the alert's window has been loaded (e.g. after
-// -setUpActiveUpdateAlertForScheduledUpdate:state:), since -[SUUpdateAlert
-// showUpdateReleaseNotesWithDownloadData:] no-ops until the window is loaded.
-- (void)_flushPendingReleaseNotes SPU_OBJC_DIRECT
-{
-    if (_activeUpdateAlert == nil || _pendingReleaseNotesReplayBlock == nil) {
-        return;
+    
+    _regularApplicationUpdate = [appcastItem.installationType isEqualToString:SPUInstallationTypeApplication];
+    
+    // For user initiated checks, let the delegate know we'll be showing an update
+    // For scheduled checks, -setUpActiveUpdateAlertForUpdate:state: below will handle this
+    if (state.userInitiated && [delegate respondsToSelector:@selector(standardUserDriverWillHandleShowingUpdate:forUpdate:state:)]) {
+        [delegate standardUserDriverWillHandleShowingUpdate:YES forUpdate:appcastItem state:state];
     }
-
-    void (^replayBlock)(SUUpdateAlert *) = _pendingReleaseNotesReplayBlock;
-    _pendingReleaseNotesReplayBlock = nil;
-    replayBlock(_activeUpdateAlert);
+    
+    [self setUpActiveUpdateAlertForScheduledUpdate:(state.userInitiated ? nil : appcastItem) state:state];
 }
 
 - (void)showUpdateReleaseNotesWithDownloadData:(SPUDownloadData *)downloadData
 {
     assert(NSThread.isMainThread);
-
-    if (_activeUpdateAlert == nil) {
-        // The alert construction is deferred until the checking window's
-        // buffered close completes (see -showUpdateFoundWithAppcastItem:...).
-        // Record the payload and replay it once the alert exists, otherwise
-        // the release-notes pane spins indefinitely.
-        _pendingReleaseNotesReplayBlock = ^(SUUpdateAlert *alert) {
-            [alert showUpdateReleaseNotesWithDownloadData:downloadData];
-        };
-        return;
-    }
-
+    
     [_activeUpdateAlert showUpdateReleaseNotesWithDownloadData:downloadData];
 }
 
 - (void)showUpdateReleaseNotesFailedToDownloadWithError:(NSError *)error
 {
     assert(NSThread.isMainThread);
-
+    
     // I don't want to expose SULog here because it's more of a user driver facing error
     // For our purposes we just ignore it and continue on..
     NSLog(@"Failed to download release notes with error: %@", error);
-
-    if (_activeUpdateAlert == nil) {
-        // See -showUpdateReleaseNotesWithDownloadData: — record until the
-        // deferred alert is built so the failure notice isn't dropped.
-        _pendingReleaseNotesReplayBlock = ^(SUUpdateAlert *alert) {
-            [alert showReleaseNotesFailedToDownloadWithError:error];
-        };
-        return;
-    }
-
     [_activeUpdateAlert showReleaseNotesFailedToDownloadWithError:error];
 }
 
@@ -550,6 +474,7 @@
         [_statusController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_checkingController != nil) {
+        [self cancelShowCheckingControllerWindowDelayBlock];
         [_checkingController showWindow:nil];
         mayNeedToActivateApp = YES;
     } else if (_retryTerminatingApplication != nil) {
@@ -620,7 +545,6 @@
 #endif
     
     _checkingController = [[SUStatusController alloc] initWithHost:_host windowTitle:SULocalizedStringFromTableInBundle(@"Software Update", SPARKLE_TABLE, sparkleBundle, nil) centerPointValue:nil minimizable:NO closable:NO];
-    [[_checkingController window] center]; // Force the checking controller to load its window.
     [_checkingController beginActionWithTitle:SULocalizedStringFromTableInBundle(@"Checking for updates…", SPARKLE_TABLE, sparkleBundle, nil) maxProgressValue:0.0 statusText:nil];
     [_checkingController setButtonTitle:SULocalizedStringFromTableInBundle(@"Cancel", SPARKLE_TABLE, sparkleBundle, nil) target:self action:@selector(cancelCheckForUpdates:) isDefault:NO accessibilityIdentifier:@"SUStatusCancel"];
     
@@ -630,33 +554,34 @@
         [self _activateApplication];
     }
     
-    [_checkingController showWindow:self];
+    // Don't show checking for updates window immediately
+    // Only show it if the check is taking a noticable amount of time.
+    // This reduces the chance of a very sudden/quick transition between
+    // checking for updates and showing the next UI.
+    __weak __typeof__(self) weakSelf = self;
+    _showCheckingControllerWindowDelayBlock = dispatch_block_create_with_qos_class((dispatch_block_flags_t)0, QOS_CLASS_USER_INITIATED, 0, ^{
+        __typeof__(self) strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [strongSelf->_checkingController showWindow:strongSelf];
+        }
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SUShowCheckingForUpdatesTimeDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), _showCheckingControllerWindowDelayBlock);
 }
 
-// Close the "Checking for updates…" window. If userCancelled is YES, this is
-// the user clicking Cancel: a pending buffered close (if any) is expedited
-// — its completion runs with userCancelled=YES, which lets each call site
-// skip the queued next-UI step while still signaling the updater to end its
-// session. If no buffered close is pending, the in-flight check is aborted via
-// _cancellation directly. If userCancelled is NO, this is the abort/teardown
-// path: the window is closed silently with no completion firing.
-- (void)closeCheckingWindow:(BOOL)userCancelled SPU_OBJC_DIRECT
+- (void)cancelShowCheckingControllerWindowDelayBlock SPU_OBJC_DIRECT
 {
-    if (userCancelled) {
-        // closeImmediately closes the window regardless. Its return tells us
-        // whether a pending buffered completion fired (and did its own
-        // cleanup) or not — if not, we still need to abort the active check.
-        if ([_checkingController closeImmediately]) {
-            return;
-        }
-        if (_cancellation != nil) {
-            _cancellation();
-            _cancellation = nil;
-        }
-        _checkingController = nil;
-        return;
+    if (_showCheckingControllerWindowDelayBlock != nil) {
+        dispatch_cancel(_showCheckingControllerWindowDelayBlock);
+        _showCheckingControllerWindowDelayBlock = nil;
     }
-    if (_checkingController != nil) {
+}
+
+- (void)closeCheckingWindow SPU_OBJC_DIRECT
+{
+    if (_checkingController != nil)
+    {
+        [self cancelShowCheckingControllerWindowDelayBlock];
+
         [_checkingController close];
         _checkingController = nil;
         _cancellation = nil;
@@ -665,45 +590,11 @@
 
 - (void)cancelCheckForUpdates:(id)__unused sender
 {
-    [self closeCheckingWindow:YES];
-}
-
-// Initiate closing the "Checking for updates…" window, waiting for any time-buffering
-// delay before continuing with the subsequent action. userCancelled is YES if
-// the user expedited the close by clicking Cancel during the buffered period.
-- (void)_closeCheckingWindowWithCompletionBlock:(void (^)(SPUStandardUserDriver * _Nullable s, BOOL userCancelled))completionBlock SPU_OBJC_DIRECT
-{
-    if (_checkingController == nil) {
-        completionBlock(self, NO);
-        return;
+    if (_cancellation != nil) {
+        _cancellation();
+        _cancellation = nil;
     }
-    __weak __typeof__(self) weakSelf = self;
-    [_checkingController closeWithCompletionBlock:^(BOOL userCancelled) {
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            strongSelf->_checkingController = nil;
-            strongSelf->_cancellation = nil;
-        }
-        completionBlock(strongSelf, userCancelled);
-    }];
-}
-
-// Same as -_closeCheckingWindowWithCompletionBlock: but for the install/progress status
-// window. No `_cancellation` to clear on this path.
-- (void)_closeStatusWindowWithCompletionBlock:(void (^)(SPUStandardUserDriver * _Nullable s, BOOL userCancelled))completionBlock SPU_OBJC_DIRECT
-{
-    if (_statusController == nil) {
-        completionBlock(self, NO);
-        return;
-    }
-    __weak __typeof__(self) weakSelf = self;
-    [_statusController closeWithCompletionBlock:^(BOOL userCancelled) {
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil) {
-            strongSelf->_statusController = nil;
-        }
-        completionBlock(strongSelf, userCancelled);
-    }];
+    [self closeCheckingWindow];
 }
 
 #pragma mark Update Errors
@@ -712,27 +603,11 @@
 {
     assert(NSThread.isMainThread);
     
-    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
-        if (s != nil && !userCancelled) {
-            [s _proceedWithUpdaterError:error acknowledgement:acknowledgement];
-        } else {
-            acknowledgement();
-        }
-    }];
-}
+    [self closeCheckingWindow];
     
-- (void)_proceedWithUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
-{
-    [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
-        if (s != nil && !userCancelled) {
-            [s _showUpdaterErrorAlertForError:error];
-        }
-        acknowledgement();
-    }];
-}
+    [_statusController close];
+    _statusController = nil;
     
-- (void)_showUpdaterErrorAlertForError:(NSError *)error SPU_OBJC_DIRECT
-{
 #if SPARKLE_COPY_LOCALIZATIONS
     NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
@@ -752,25 +627,18 @@
         alert.informativeText = error.localizedDescription;
     }
     
-    [alert addButtonWithTitle:SULocalizedStringFromTableInBundle(@"Cancel Update", SPARKLE_TABLE, sparkleBundle, nil)];
+    [alert addButtonWithTitle:SULocalizedStringFromTableInBundle(@"Cancel Update", SPARKLE_TABLE, sparkleBundle, @"Run generate_progress_tool_localizations.py after updating.")];
     [self showAlert:alert secondaryAction:nil];
+    
+    acknowledgement();
 }
 
 - (void)showUpdateNotFoundWithError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement
 {
     assert(NSThread.isMainThread);
     
-    [self _closeCheckingWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
-        if (s != nil && !userCancelled) {
-            [s _proceedWithUpdateNotFoundWithError:error acknowledgement:acknowledgement];
-        } else {
-            acknowledgement();
-        }
-    }];
-}
+    [self closeCheckingWindow];
     
-- (void)_proceedWithUpdateNotFoundWithError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement SPU_OBJC_DIRECT
-{
     id <SPUStandardUserDriverDelegate> delegate = _delegate;
     
     id<SUVersionDisplay> customVersionDisplayer;
@@ -916,7 +784,7 @@
             centerPointValue = nil;
         }
         
-        _statusController = [[SUStatusController alloc] initWithHost:_host windowTitle:[NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"Updating %@", SPARKLE_TABLE, SUSparkleBundle(), nil), _host.name] centerPointValue:centerPointValue minimizable:minimizable closable:closable];
+        _statusController = [[SUStatusController alloc] initWithHost:_host windowTitle:[NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"Updating %@", SPARKLE_TABLE, SUSparkleBundle(), @"Run generate_progress_tool_localizations.py after updating."), _host.name] centerPointValue:centerPointValue minimizable:minimizable closable:closable];
         
         if (_updateAlertWindowWasInactive) {
             [_statusController.window orderFront:nil];
@@ -947,17 +815,10 @@
 
 - (void)cancelDownload:(id)__unused sender
 {
-    // closeImmediately closes the window regardless. Its return tells us
-    // whether a pending buffered completion fired (and did its own cleanup) or
-    // not — if not, we still need to invoke the active-download cancellation.
-    if ([_statusController closeImmediately]) {
-        return;
-    }
     if (_cancellation != nil) {
         _cancellation();
         _cancellation = nil;
     }
-    _statusController = nil;
 }
 
 - (void)showDownloadDidReceiveExpectedContentLength:(uint64_t)expectedContentLength
@@ -1024,23 +885,17 @@
     
     if (applicationTerminated) {
         // Note this will only show up if -showReadyToInstallAndRelaunch: was called beforehand
-        [_statusController beginActionWithTitle:SULocalizedStringFromTableInBundle(@"Installing update…", SPARKLE_TABLE, SUSparkleBundle(), @"Take care not to overflow the status window.") maxProgressValue:0.0 statusText:nil];
+        [_statusController beginActionWithTitle:SULocalizedStringFromTableInBundle(@"Installing update…", SPARKLE_TABLE, SUSparkleBundle(), @"Run generate_progress_tool_localizations.py after updating.") maxProgressValue:0.0 statusText:nil];
         [_statusController setButtonEnabled:NO];
     } else {
         // The "quit" event can always be canceled or delayed by the application we're updating
         // So we can't easily predict how long the installation will take or if it won't happen right away
         // We close our status window because we don't want it persisting for too long and have it obscure other windows
-        // The retry handler is assigned alongside the close completion so it
-        // never co-exists with _statusController.
-        void (^retry)(void) = [retryTerminatingApplication copy];
-        [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL __unused userCancelled) {
-            // userCancelled is ignored: the install is in flight regardless of
-            // what the user does about the visible status window, so the retry
-            // handler still needs to be available.
-            if (s != nil) {
-                s->_retryTerminatingApplication = retry;
-            }
-        }];
+        [_statusController close];
+        _statusController = nil;
+        
+        // Keep retry handler in case user tries to show update in focus again
+        _retryTerminatingApplication = [retryTerminatingApplication copy];
     }
 }
 
@@ -1048,45 +903,43 @@
 {
     assert(NSThread.isMainThread);
     
-    // Only show installed prompt when the app is not relaunched —
-    // when the app is relaunched, there is enough of a UI from relaunching the app.
-    [self _closeStatusWindowWithCompletionBlock:^(SPUStandardUserDriver *s, BOOL userCancelled) {
-        if (s != nil && !userCancelled && !relaunched) {
-            [s _showUpdateInstalledAlert];
-        }
-        acknowledgement();
-    }];
-}
+    // Close window showing update is installing
+    [_statusController close];
+    _statusController = nil;
     
-- (void)_showUpdateInstalledAlert SPU_OBJC_DIRECT
-{
+    // Only show installed prompt when the app is not relaunched
+    // When the app is relaunched, there is enough of a UI from relaunching the app.
+    if (!relaunched) {
 #if SPARKLE_COPY_LOCALIZATIONS
-    NSBundle *sparkleBundle = SUSparkleBundle();
+        NSBundle *sparkleBundle = SUSparkleBundle();
 #endif
         
-    NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = SULocalizedStringFromTableInBundle(@"Update Installed", SPARKLE_TABLE, sparkleBundle, nil);
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = SULocalizedStringFromTableInBundle(@"Update Installed", SPARKLE_TABLE, sparkleBundle, nil);
         
-    // Extract information from newly updated bundle if available
-    NSString *hostName;
-    NSString *hostVersion;
-    NSBundle *newBundle = [NSBundle bundleWithURL:_oldHostBundleURL];
-    if (newBundle != nil) {
-        SUHost *newHost = [[SUHost alloc] initWithBundle:newBundle];
-        hostName = newHost.name;
-        hostVersion = newHost.displayVersion;
-    } else {
-        // This may happen if Sparkle's normalization is enabled
-        hostName = _oldHostName;
-        hostVersion = nil;
+        // Extract information from newly updated bundle if available
+        NSString *hostName;
+        NSString *hostVersion;
+        NSBundle *newBundle = [NSBundle bundleWithURL:_oldHostBundleURL];
+        if (newBundle != nil) {
+            SUHost *newHost = [[SUHost alloc] initWithBundle:newBundle];
+            hostName = newHost.name;
+            hostVersion = newHost.displayVersion;
+        } else {
+            // This may happen if Sparkle's normalization is enabled
+            hostName = _oldHostName;
+            hostVersion = nil;
+        }
+        
+        if (hostVersion != nil) {
+            alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated to version %@!", SPARKLE_TABLE, sparkleBundle, nil), hostName, hostVersion];
+        } else {
+            alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated!", SPARKLE_TABLE, sparkleBundle, nil), hostName];
+        }
+        [self showAlert:alert secondaryAction:nil];
     }
     
-    if (hostVersion != nil) {
-        alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated to version %@!", SPARKLE_TABLE, sparkleBundle, nil), hostName, hostVersion];
-    } else {
-        alert.informativeText = [NSString stringWithFormat:SULocalizedStringFromTableInBundle(@"%@ is now updated!", SPARKLE_TABLE, sparkleBundle, nil), hostName];
-    }
-    [self showAlert:alert secondaryAction:nil];
+    acknowledgement();
 }
 
 #pragma mark Aborting Everything
@@ -1109,9 +962,8 @@
     _installUpdateHandler = nil;
     _cancellation = nil;
     _retryTerminatingApplication = nil;
-    _pendingReleaseNotesReplayBlock = nil;
     
-    [self closeCheckingWindow:NO];
+    [self closeCheckingWindow];
     
     if (_permissionPrompt) {
         [_permissionPrompt close];

@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #import <sys/stat.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 
 #include "AppKitPrevention.h"
@@ -46,14 +48,14 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
 
     unsigned char *expectedBeforeHash = header.beforeTreeHash;
     unsigned char *expectedAfterHash = header.afterTreeHash;
-
+    
     if (majorDiffVersion < SUBinaryDeltaMajorVersionFirst) {
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Unable to identify diff-version %u in delta.  Giving up.", majorDiffVersion] }];
         }
         return NO;
     }
-
+    
     if (majorDiffVersion < SUBinaryDeltaMajorVersionFirstSupported) {
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Applying version %u patches is no longer supported.", majorDiffVersion] }];
@@ -67,14 +69,14 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
         }
         return NO;
     }
-
+    
     // Reject patches that did not generate valid hierarchical xar container paths
     // These will not succeed to patch using recent versions of BinaryDelta
-    if ([[archive class] maySupportSafeExtraction] && majorDiffVersion == SUBinaryDeltaMajorVersion2 && minorDiffVersion < 3) {
+    if (majorDiffVersion == SUBinaryDeltaMajorVersion2 && minorDiffVersion < 3) {
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"This patch version (%u.%u) is too old and potentially unsafe to apply. Please re-generate the patch using the latest version of BinaryDelta or generate_appcast. New version %u.%u patches will still be compatible with older versions of Sparkle.", majorDiffVersion, minorDiffVersion, majorDiffVersion, latestMinorVersionForMajorVersion(majorDiffVersion)] }];
         }
-
+        
         return NO;
     }
 
@@ -91,7 +93,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     }
 
     progressCallback(1/7.0);
-
+    
     unsigned char beforeHash[BINARY_DELTA_HASH_LENGTH] = {0};
     if (!getRawHashOfTreeWithVersion(beforeHash, source, majorDiffVersion)) {
         if (verbose) {
@@ -102,7 +104,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
         }
         return NO;
     }
-
+    
     if (memcmp(beforeHash, expectedBeforeHash, BINARY_DELTA_HASH_LENGTH) != 0) {
         if (verbose) {
             fprintf(stderr, "\n");
@@ -118,7 +120,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     }
 
     progressCallback(2/7.0);
-
+    
     // Make a temporary destination path if necessary
     // If we want to apply file system compression after we're done applying, we'll need to use a different
     // temporary path
@@ -142,7 +144,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     progressCallback(3/7.0);
 
     NSFileManager *fileManager = [[NSFileManager alloc] init];
-
+    
     if (!copyTree(fileManager, source, destination)) {
         if (verbose) {
             fprintf(stderr, "\n");
@@ -152,7 +154,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
         }
         return NO;
     }
-
+    
     // Preserve file creation date only for the root item if the date is recorded
     // (requires major version 4 or later)
     NSDate *bundleCreationDate = header.bundleCreationDate;
@@ -168,7 +170,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     if (verbose) {
         fprintf(stderr, "\nPatching...");
     }
-
+    
     // Ensure error is cleared out in advance
     if (error != NULL) {
         *error = nil;
@@ -176,7 +178,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
 
     [archive enumerateItems:^(SPUDeltaArchiveItem *item, BOOL *stop) {
         NSString *relativePath = item.relativeFilePath;
-
+        
         NSArray<NSString *> *relativePathComponents = relativePath.pathComponents;
         if ([relativePathComponents containsObject:@".."]) {
             if (error != NULL) {
@@ -185,10 +187,10 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
             *stop = YES;
             return;
         }
-
+        
         NSString *sourceFilePath = [source stringByAppendingPathComponent:relativePath];
         NSString *destinationFilePath = [destination stringByAppendingPathComponent:relativePath];
-
+        
         {
             // Walk each intermediate directory component of relativePath, excluding the last component, and verify none are symlinks.
             NSUInteger relativePathComponentCount = relativePathComponents.count;
@@ -211,14 +213,14 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                         // Directory doesn't exist, so it can't be a symlink - safe to continue
                         break;
                     }
-
+                    
                     if (error != NULL) {
                         *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because failed to stat '%@' with error: %d", cumulativePath, errno] }];
                     }
                     *stop = YES;
                     return;
                 }
-
+                
                 if (S_ISLNK(cumulativePathStat.st_mode)) {
                     if (error != NULL) {
                         *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create patch because '%@' cannot contain a symbolic link in its intermediate path.", destinationFilePath.stringByDeletingLastPathComponent] }];
@@ -229,10 +231,9 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
             }
         }
 
-        // Don't use -[NSFileManager fileExistsAtPath:] because it will follow symbolic links
-        BOOL fileExisted = verbose && [fileManager attributesOfItemAtPath:destinationFilePath error:nil];
+        BOOL fileExisted = verbose && fileExists(destinationFilePath);
         BOOL removedFile = NO;
-
+        
         // Files that have no property set that we check for will get ignored
         // This is important because they aren't part of the delta, just part of the directory structure
         SPUDeltaItemCommands commands = item.commands;
@@ -260,12 +261,12 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                 *stop = YES;
                 return;
             }
-
+            
             NSString *clonedOriginalPath = [source stringByAppendingPathComponent:clonedRelativePath];
-
+            
             // Ensure there isn't an item already at our destination
             [fileManager removeItemAtPath:destinationFilePath error:NULL];
-
+            
             NSError *copyError = nil;
             if (![fileManager copyItemAtPath:clonedOriginalPath toPath:destinationFilePath error:&copyError]) {
                 if (verbose) {
@@ -274,18 +275,18 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                 if (error != NULL) {
                     *error = copyError;
                 }
-
+                
                 *stop = YES;
                 return;
             }
-
+            
             if (verbose) {
                 fprintf(stderr, "\n✂️   %s %s -> %s", VERBOSE_CLONED, [clonedRelativePath fileSystemRepresentation], [relativePath fileSystemRepresentation]);
             }
         } else if ((commands & SPUDeltaItemCommandBinaryDiff) != 0) {
             NSString *tempDiffFile = temporaryFilename(@"apply-binary-delta");
             item.itemFilePath = tempDiffFile;
-
+            
             if (![archive extractItem:item]) {
                 if (verbose) {
                     fprintf(stderr, "\n");
@@ -294,10 +295,12 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                     *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Unable to extract diffed file to %@", tempDiffFile], NSUnderlyingErrorKey: (NSError * _Nonnull)archive.error }];
                 }
 
+                unlink(tempDiffFile.fileSystemRepresentation);
+
                 *stop = YES;
                 return;
             }
-
+            
             NSString *sourceDiffFilePath;
             NSString *clonedRelativePath;
             if ((commands & SPUDeltaItemCommandClone) != 0) {
@@ -306,31 +309,44 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                     if (error != NULL) {
                         *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Relative path for clone '%@' contains '..' path component", clonedRelativePath] }];
                     }
+
+                    unlink(tempDiffFile.fileSystemRepresentation);
+
                     *stop = YES;
                     return;
                 }
-
+                
                 sourceDiffFilePath = [source stringByAppendingPathComponent:clonedRelativePath];
             } else {
                 sourceDiffFilePath = sourceFilePath;
                 clonedRelativePath = nil;
             }
-
+            
             // Decide if we need to preserve original file permissions from the original file
             // applyBinaryDeltaToFile() normally preserves file permissions on the file it's replacing.
             // However this is not possible if the destination file we're patching is not writable.
             // We also need to preserve permissions for clones except when we'll be changing permissions later anyway.
+            BOOL destinationFileIsWritable;
+            {
+                const char *destinationFileSystemRepresentation = destinationFilePath.fileSystemRepresentation;
+                struct stat destinationFileInfo;
+                destinationFileIsWritable =
+                    (lstat(destinationFileSystemRepresentation, &destinationFileInfo) == 0 &&
+                    !S_ISLNK(destinationFileInfo.st_mode) &&
+                    access(destinationFileSystemRepresentation, W_OK) == 0);
+                    
+            }
             BOOL needsToCopyFilePermissions;
-            if (![fileManager isWritableFileAtPath:destinationFilePath]) {
+            if (!destinationFileIsWritable) {
                 // Remove the file non-writable we're patching that may cause issues
                 [fileManager removeItemAtPath:destinationFilePath error:NULL];
-
+                
                 // We will need to preserve permissions if there is no need to make permission changes later on
                 needsToCopyFilePermissions = (commands & SPUDeltaItemCommandModifyPermissions) == 0;
             } else {
                 needsToCopyFilePermissions = ((commands & SPUDeltaItemCommandClone) != 0) && ((commands & SPUDeltaItemCommandModifyPermissions) == 0);
             }
-
+            
             if (!applyBinaryDeltaToFile(tempDiffFile, sourceDiffFilePath, destinationFilePath)) {
                 if (verbose) {
                     fprintf(stderr, "\n");
@@ -341,7 +357,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                 *stop = YES;
                 return;
             }
-
+            
             if (needsToCopyFilePermissions) {
                 struct stat sourceFileInfo = {0};
                 if (lstat(sourceDiffFilePath.fileSystemRepresentation, &sourceFileInfo) != 0) {
@@ -354,7 +370,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
                     *stop = YES;
                     return;
                 }
-
+                
                 if (chmod(destinationFilePath.fileSystemRepresentation, sourceFileInfo.st_mode) != 0) {
                     if (verbose) {
                         fprintf(stderr, "\n");
@@ -416,9 +432,9 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
             }
         }
     }];
-
+    
     [archive close];
-
+    
     // Set error from enumerating items if we have encountered an error and haven't set it yet
     NSError *archiveError = archive.error;
     if (archiveError != nil) {
@@ -433,38 +449,44 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
     }
 
     progressCallback(5/7.0);
-
+    
     // Re-apply file system compression is requested
     if (header.fileSystemCompression) {
         if (verbose) {
             fprintf(stderr, "\nApplying file system compression...");
         }
-
+        
+        NSMutableArray<NSString *> *dittoArguments = [@[@"--hfsCompression"] mutableCopy];
+        if (@available(macOS 27, *)) {
+            // Compression won't be applied on macOS 27 without passing --noclone
+            [dittoArguments addObject:@"--noclone"];
+        }
+        [dittoArguments addObjectsFromArray:@[destination, finalDestination]];
+        
         NSTask *dittoTask = [[NSTask alloc] init];
-
         dittoTask.executableURL = [NSURL fileURLWithPath:@"/usr/bin/ditto" isDirectory:NO];
-        dittoTask.arguments = @[@"--hfsCompression", destination, finalDestination];
-
+        dittoTask.arguments = [dittoArguments copy];
+        
         // If we fail to apply file system compression, we will try falling back to not doing this
         BOOL failedToApplyFileSystemCompression = NO;
-
+        
         NSError *launchError = nil;
         if (![dittoTask launchAndReturnError:&launchError]) {
             failedToApplyFileSystemCompression = YES;
-
+            
             fprintf(stderr, "\nWarning: failed to launch ditto task for file compression: %s", launchError.localizedDescription.UTF8String);
         }
-
+        
         if (!failedToApplyFileSystemCompression) {
             [dittoTask waitUntilExit];
-
+            
             if (dittoTask.terminationStatus != 0) {
                 failedToApplyFileSystemCompression = YES;
-
+                
                 fprintf(stderr, "\nWarning: ditto task for file compression returned exit status %d", dittoTask.terminationStatus);
             }
         }
-
+        
         if (failedToApplyFileSystemCompression) {
             // Try to replace bundle normally
             if (![fileManager replaceItemAtURL:[NSURL fileURLWithPath:finalDestination] withItemAtURL:[NSURL fileURLWithPath:destination isDirectory:YES] backupItemName:nil options:(NSFileManagerItemReplacementOptions)0 resultingItemURL:NULL error:error]) {
@@ -476,13 +498,38 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
             [fileManager removeItemAtURL:[NSURL fileURLWithPath:destination isDirectory:YES] error:NULL];
         }
     }
+    
+    // According to https://developer.apple.com/library/mac/documentation/Carbon/Conceptual/MDImporters/Concepts/Troubleshooting.html
+    // we should make sure mdimporter bundles have an up to date modification time in case they were delta updated.
+    // We used to invoke mdimport on the bundle but this is not a very good approach.
+    // Updating the timestamp on the mdimporter bundles is what developers have to do anyway when shipping their new update outside of Sparkle.
+    NSString *spotlightDirectory = [finalDestination stringByAppendingPathComponent:@"Contents/Library/Spotlight"];
+    for (NSString *spotlightItem in [fileManager contentsOfDirectoryAtPath:spotlightDirectory error:NULL]) {
+        if ([spotlightItem.pathExtension isEqualToString:@"mdimporter"]) {
+            const char *mdimporterPath = [spotlightDirectory stringByAppendingPathComponent:spotlightItem].fileSystemRepresentation;
 
+            // Using O_SYMLINK so we touch the item itself rather than what it may point to
+            int mdimporterFileDescriptor = open(mdimporterPath, O_RDONLY | O_SYMLINK);
+            if (mdimporterFileDescriptor == -1) {
+                fprintf(stderr, "\nWarning: failed to open file descriptor to touch %s: %s", mdimporterPath, strerror(errno));
+                continue;
+            }
+
+            // Using futimes() because utimes() follows symbolic links
+            if (futimes(mdimporterFileDescriptor, NULL) != 0) {
+                fprintf(stderr, "\nWarning: failed to touch %s: %s", mdimporterPath, strerror(errno));
+            }
+
+            close(mdimporterFileDescriptor);
+        }
+    }
+    
     progressCallback(6/7.0);
-
+    
     if (verbose) {
         fprintf(stderr, "\nVerifying destination...");
     }
-
+    
     unsigned char afterHash[BINARY_DELTA_HASH_LENGTH] = {0};
     if (!getRawHashOfTreeWithVersion(afterHash, finalDestination, majorDiffVersion)) {
         if (verbose) {
@@ -494,7 +541,7 @@ BOOL applyBinaryDelta(NSString *source, NSString *finalDestination, NSString *pa
         removeTree(finalDestination);
         return NO;
     }
-
+    
     if (memcmp(afterHash, expectedAfterHash, BINARY_DELTA_HASH_LENGTH) != 0) {
         if (verbose) {
             fprintf(stderr, "\n");
