@@ -192,15 +192,7 @@
             NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:iconBundlePath];
             
             // Creating a bitmap representation at a specific size is much cheaper than asking for icon's TIFFRepresentation
-            // On older OS's we must create a 32x32 image otherwise it won't be scaled correctly in the dialog
-            // On newer OS's we can use a slightly higher resolution image
-            NSInteger imageDimensions;
-            if (@available(macOS 10.15, *)) {
-                imageDimensions = 64;
-            } else {
-                imageDimensions = 32;
-            }
-            
+            const NSInteger imageDimensions = 64;
             NSBitmapImageRep *iconBitmapRep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:imageDimensions pixelsHigh:imageDimensions bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSCalibratedRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
             
             [NSGraphicsContext saveGraphicsState];
@@ -506,8 +498,6 @@ static BOOL SPUUsesSystemDomainForBundlePath(NSString *path, BOOL rootUser
         
         NSString *userName;
         NSString *homeDirectory;
-        uid_t uid = 0;
-        gid_t gid = 0;
         if (!rootUser) {
             // Normal path
             homeDirectory = NSHomeDirectory();
@@ -518,7 +508,7 @@ static BOOL SPUUsesSystemDomainForBundlePath(NSString *path, BOOL rootUser
         } else {
             // As the root user we need to obtain the user name and home directory reflecting
             // the user's console session.
-            CFStringRef userNameRef = SCDynamicStoreCopyConsoleUser(NULL, &uid, &gid);
+            CFStringRef userNameRef = SCDynamicStoreCopyConsoleUser(NULL, NULL, NULL);
             if (userNameRef == NULL) {
                 SULog(SULogLevelError, @"Failed to retrieve user name from the console user");
                 completionHandler(SUInstallerLauncherFailure, inSystemDomain);
@@ -535,59 +525,11 @@ static BOOL SPUUsesSystemDomainForBundlePath(NSString *path, BOOL rootUser
             }
         }
         
-        // It may be tempting here to validate/match the signature of the installer and progress tool, however this is not very reliable
-        // We can't compare the signature of this framework/XPC service (depending how it's run) to the host bundle because
-        // they could be different (eg: take a look at sparkle-cli). We also can't easily tell if the signature of the service/framework is the same as the bundle it's inside.
-        // The service/framework also need not even be signed in the first place. We'll just assume for now the original bundle hasn't been tampered with
-        NSString *cachePath = rootUser ?
-            [SPULocalCacheDirectory cachePathForBundleIdentifier:hostBundleIdentifier userName:userName] :
-            [SPULocalCacheDirectory cachePathForBundleIdentifier:hostBundleIdentifier];
-        
-        NSString *rootLauncherCachePath = [cachePath stringByAppendingPathComponent:@"Launcher"];
-        
-        [SPULocalCacheDirectory removeOldItemsInDirectory:rootLauncherCachePath];
-        
-        NSDictionary<NSFileAttributeKey, id> *fileAttributes = rootUser ?
-            @{NSFileOwnerAccountID: @(uid), NSFileGroupOwnerAccountID: @(gid)} :
-            nil;
-        
-        NSString *launcherCachePath = [SPULocalCacheDirectory createUniqueDirectoryInDirectory:rootLauncherCachePath intermediateDirectoryFileAttributes:fileAttributes];
-        
-        if (launcherCachePath == nil) {
-            SULog(SULogLevelError, @"Failed to create cache directory for progress tool in %@", rootLauncherCachePath);
-            completionHandler(SUInstallerLauncherFailure, inSystemDomain);
-            return;
-        }
-        
-        SUFileManager *fileManager = [[SUFileManager alloc] init];
-        
-        if (rootUser) {
-            // Ensure the console user has ownership of the launcher cache directory
-            // Otherwise the updater may not launch and not be able to clean up itself
-            NSError *changeOwnerAndGroupError = nil;
-            if (![fileManager changeOwnerAndGroupOfItemAtURL:[NSURL fileURLWithPath:launcherCachePath] ownerID:uid groupID:gid error:&changeOwnerAndGroupError]) {
-                SULog(SULogLevelError, @"Failed to change owner and group for launcher cache directory: %@", changeOwnerAndGroupError);
-                
-                completionHandler(SUInstallerLauncherFailure, inSystemDomain);
-                return;
-            }
-        }
-        
-        NSString *progressToolPath = [launcherCachePath stringByAppendingPathComponent:@""SPARKLE_INSTALLER_PROGRESS_TOOL_NAME@".app"];
-        
-        NSError *copyError = nil;
-        // SUFileManager is more reliable for copying files around
-        if (![fileManager copyItemAtURL:[NSURL fileURLWithPath:progressToolResourcePath] toURL:[NSURL fileURLWithPath:progressToolPath] error:&copyError]) {
-            SULog(SULogLevelError, @"Failed to copy progress tool to cache: %@", copyError);
-            completionHandler(SUInstallerLauncherFailure, inSystemDomain);
-            return;
-        }
-        
         SUInstallerLauncherStatus installerStatus = [self submitInstallerAtPath:installerPath withHostBundle:hostBundle iconBundlePath:mainBundle.bundlePath updaterIdentifier:updaterIdentifier userName:userName homeDirectory:homeDirectory mainBundleName:mainBundleName inSystemDomain:inSystemDomain rootUser:rootUser];
         
         BOOL submittedProgressTool = NO;
         if (installerStatus == SUInstallerLauncherSuccess) {
-            submittedProgressTool = [self submitProgressToolAtPath:progressToolPath withHostBundle:hostBundle inSystemDomainForInstaller:inSystemDomain];
+            submittedProgressTool = [self submitProgressToolAtPath:progressToolResourcePath withHostBundle:hostBundle inSystemDomainForInstaller:inSystemDomain];
             
             if (!submittedProgressTool) {
                 SULog(SULogLevelError, @"Failed to submit progress tool job");

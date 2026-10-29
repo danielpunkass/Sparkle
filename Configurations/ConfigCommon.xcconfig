@@ -98,13 +98,13 @@ SPARKLE_ICON_NAME = AppIcon
 // If you change any of these version details, you must increase CURRENT_PROJECT_VERSION
 // These variables must have a space after the '=' too
 SPARKLE_VERSION_MAJOR = 2
-SPARKLE_VERSION_MINOR = 9
-SPARKLE_VERSION_PATCH = 2
+SPARKLE_VERSION_MINOR = 10
+SPARKLE_VERSION_PATCH = 1
 
 // This should be in SemVer format or empty, ie. "-beta.1"
 // These variables must have a space after the '=' too
 SPARKLE_VERSION_SUFFIX =
-CURRENT_PROJECT_VERSION = 2057
+CURRENT_PROJECT_VERSION = 2065
 
 MARKETING_VERSION = $(SPARKLE_VERSION_MAJOR).$(SPARKLE_VERSION_MINOR).$(SPARKLE_VERSION_PATCH)$(SPARKLE_VERSION_SUFFIX)
 ALWAYS_SEARCH_USER_PATHS = NO
@@ -172,7 +172,7 @@ GCC_WARN_UNUSED_VARIABLE = YES
 WARNING_CFLAGS_ALLOW_UNDERSCORES = -Wno-reserved-identifier
 
 // Turn on all warnings, then disable a few which are almost impossible to avoid
-WARNING_CFLAGS = -Wall -Weverything -Wno-unused-macros -Wno-gnu-statement-expression -Wno-auto-import -Wno-gnu-zero-variadic-macro-arguments -Wno-format-non-iso -Wno-direct-ivar-access -Wno-declaration-after-statement -Wno-gnu-conditional-omitted-operand -Wno-switch-default -Wno-missing-include-dirs -Werror=undef $(WARNING_CFLAGS_ALLOW_UNDERSCORES)
+WARNING_CFLAGS = -Wall -Weverything -Wno-unused-macros -Wno-gnu-statement-expression -Wno-auto-import -Wno-gnu-zero-variadic-macro-arguments -Wno-format-non-iso -Wno-pre-c11-compat -Wno-direct-ivar-access -Wno-declaration-after-statement -Wno-gnu-conditional-omitted-operand -Wno-switch-default -Wno-missing-include-dirs -Werror=undef $(WARNING_CFLAGS_ALLOW_UNDERSCORES)
 
 // Prevents spurious warnings based on dependency scan considering Sparkle itself a dependency
 DIAGNOSE_MISSING_TARGET_DEPENDENCIES = NO

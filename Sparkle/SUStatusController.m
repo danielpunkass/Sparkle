@@ -16,13 +16,6 @@
 
 static NSString *const SUStatusControllerTouchBarIdentifier = @"" SPARKLE_BUNDLE_IDENTIFIER ".SUStatusController";
 
-// Buffering parameters for -showWindow: and -closeWithCompletionBlock:. We hide
-// the window entirely if a close arrives within SUStatusDisplayDelay,
-// and we enforce a minimum visible duration of SUStatusMinimumDisplayTime
-// once the window has actually appeared on screen.
-static const NSTimeInterval SUStatusDisplayDelay = 0.3;
-static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
-
 @interface SUStatusController () <NSTouchBarDelegate>
 
 // These properties are used for bindings
@@ -33,23 +26,15 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
 
 @implementation SUStatusController
 {
-    NSString *_windowTitle;
     NSValue *_centerPointValue;
     NSString *_title;
     NSString *_buttonTitle;
     SUHost *_host;
     NSButton *_touchBarButton;
-    
-    IBOutlet NSButton *_actionButton;
-    IBOutlet NSTextField *_statusTextField;
-    IBOutlet NSProgressIndicator *_progressBar;
 
-    BOOL _waitingToShowWindow;
-    NSTimeInterval _windowShownTime;
-    void (^_pendingCloseCompletion)(BOOL userCancelled);
-    
-    BOOL _minimizable;
-    BOOL _closable;
+    NSTextField *_titleField;
+    NSButton *_actionButton;
+    NSProgressIndicator *_progressBar;
 }
 
 @synthesize title = _title;
@@ -60,15 +45,145 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
 
 - (instancetype)initWithHost:(SUHost *)aHost windowTitle:(NSString *)windowTitle centerPointValue:(NSValue *)centerPointValue minimizable:(BOOL)minimizable closable:(BOOL)closable
 {
-    self = [super initWithWindowNibName:@"SUStatus" owner:self];
-	if (self)
+    NSWindow *window;
+    NSImageView *imageView;
+    NSTextField *titleField;
+    NSProgressIndicator *progressBar;
+    NSButton *actionButton;
+    NSTextField *statusTextField;
+    {
+        NSWindowStyleMask styleMask = NSWindowStyleMaskTitled;
+        if (minimizable) {
+            styleMask |= NSWindowStyleMaskMiniaturizable;
+        }
+        if (closable) {
+            styleMask |= NSWindowStyleMaskClosable;
+        }
+        
+        window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 400, 107) styleMask:styleMask backing:NSBackingStoreBuffered defer:NO];
+        window.identifier = @"SUStatus";
+        window.title = windowTitle;
+        window.releasedWhenClosed = NO;
+        window.allowsToolTipsWhenApplicationIsInactive = NO;
+        window.autorecalculatesKeyViewLoop = NO;
+        // Don't let this window make other active windows exit in Stage Manager
+        window.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary;
+        window.contentMinSize = NSMakeSize(213, 107);
+
+        NSView *contentView = window.contentView;
+
+        imageView = [[NSImageView alloc] initWithFrame:NSZeroRect];
+        imageView.translatesAutoresizingMaskIntoConstraints = NO;
+        imageView.refusesFirstResponder = YES;
+        imageView.imageAlignment = NSImageAlignLeft;
+        imageView.imageScaling = NSImageScaleAxesIndependently;
+        imageView.image = [SUApplicationInfo bestIconForHost:aHost];
+        [contentView addSubview:imageView];
+
+        NSView *statusContainerView = [[NSView alloc] initWithFrame:NSZeroRect];
+        statusContainerView.translatesAutoresizingMaskIntoConstraints = NO;
+        [contentView addSubview:statusContainerView];
+
+        titleField = [NSTextField labelWithString:@""];
+        titleField.translatesAutoresizingMaskIntoConstraints = NO;
+        titleField.focusRingType = NSFocusRingTypeNone;
+        titleField.font = [NSFont boldSystemFontOfSize:[NSFont systemFontSize]];
+        titleField.textColor = [NSColor controlTextColor];
+        [titleField setContentHuggingPriority:750 forOrientation:NSLayoutConstraintOrientationVertical];
+        // Don't let the title string line wrap
+        [titleField setContentCompressionResistancePriority:1000 forOrientation:NSLayoutConstraintOrientationHorizontal];
+        [statusContainerView addSubview:titleField];
+
+        progressBar = [[NSProgressIndicator alloc] initWithFrame:NSZeroRect];
+        progressBar.translatesAutoresizingMaskIntoConstraints = NO;
+        progressBar.wantsLayer = YES;
+        progressBar.style = NSProgressIndicatorStyleBar;
+        progressBar.indeterminate = YES;
+        progressBar.maxValue = 100;
+        [progressBar setContentHuggingPriority:750 forOrientation:NSLayoutConstraintOrientationVertical];
+        [progressBar setUsesThreadedAnimation:YES];
+        [statusContainerView addSubview:progressBar];
+
+        actionButton = [NSButton buttonWithTitle:@"" target:nil action:NULL];
+        actionButton.translatesAutoresizingMaskIntoConstraints = NO;
+        if (@available(macOS 26, *)) {
+            actionButton.controlSize = NSControlSizeLarge;
+        }
+        [actionButton setContentHuggingPriority:750 forOrientation:NSLayoutConstraintOrientationVertical];
+        actionButton.accessibilityIdentifier = @"SUStatusButton";
+        [contentView addSubview:actionButton];
+
+        statusTextField = [NSTextField labelWithString:@""];
+        [statusTextField setFont:[NSFont monospacedDigitSystemFontOfSize:0 weight:NSFontWeightRegular]];
+        statusTextField.translatesAutoresizingMaskIntoConstraints = NO;
+        statusTextField.focusRingType = NSFocusRingTypeNone;
+        statusTextField.textColor = [NSColor controlTextColor];
+        [statusTextField setContentHuggingPriority:750 forOrientation:NSLayoutConstraintOrientationVertical];
+        // Make horizontal compression resistance required for the status text field
+        [statusTextField setContentCompressionResistancePriority:1000 forOrientation:NSLayoutConstraintOrientationHorizontal];
+        [contentView addSubview:statusTextField];
+
+        [NSLayoutConstraint activateConstraints:@[
+            // Status container's internal layout
+            [NSLayoutConstraint constraintWithItem:statusContainerView attribute:NSLayoutAttributeTrailing relatedBy:NSLayoutRelationEqual toItem:titleField attribute:NSLayoutAttributeTrailing multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:statusContainerView attribute:NSLayoutAttributeBottom relatedBy:NSLayoutRelationEqual toItem:progressBar attribute:NSLayoutAttributeBottom multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:titleField attribute:NSLayoutAttributeTop relatedBy:NSLayoutRelationEqual toItem:statusContainerView attribute:NSLayoutAttributeTop multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:statusContainerView attribute:NSLayoutAttributeTrailing relatedBy:NSLayoutRelationEqual toItem:progressBar attribute:NSLayoutAttributeTrailing multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:titleField attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationEqual toItem:statusContainerView attribute:NSLayoutAttributeLeading multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:progressBar attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationEqual toItem:statusContainerView attribute:NSLayoutAttributeLeading multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:progressBar attribute:NSLayoutAttributeTop relatedBy:NSLayoutRelationEqual toItem:titleField attribute:NSLayoutAttributeBottom multiplier:1 constant:8],
+
+            // imageView
+            [imageView.widthAnchor constraintEqualToConstant:64],
+            [imageView.heightAnchor constraintEqualToConstant:64],
+            [NSLayoutConstraint constraintWithItem:imageView attribute:NSLayoutAttributeTop relatedBy:NSLayoutRelationEqual toItem:contentView attribute:NSLayoutAttributeTop multiplier:1 constant:4],
+            [NSLayoutConstraint constraintWithItem:imageView attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationEqual toItem:contentView attribute:NSLayoutAttributeLeading multiplier:1 constant:20],
+
+            // statusContainerView position
+            [NSLayoutConstraint constraintWithItem:statusContainerView attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:imageView attribute:NSLayoutAttributeCenterY multiplier:1 constant:0],
+            [NSLayoutConstraint constraintWithItem:statusContainerView attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationEqual toItem:imageView attribute:NSLayoutAttributeTrailing multiplier:1 constant:8],
+            [NSLayoutConstraint constraintWithItem:contentView attribute:NSLayoutAttributeTrailing relatedBy:NSLayoutRelationEqual toItem:statusContainerView attribute:NSLayoutAttributeTrailing multiplier:1 constant:20],
+
+            // statusTextField position
+            [NSLayoutConstraint constraintWithItem:statusTextField attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationEqual toItem:imageView attribute:NSLayoutAttributeTrailing multiplier:1 constant:8],
+            [NSLayoutConstraint constraintWithItem:statusTextField attribute:NSLayoutAttributeFirstBaseline relatedBy:NSLayoutRelationEqual toItem:actionButton attribute:NSLayoutAttributeFirstBaseline multiplier:1 constant:0],
+
+            // actionButton position
+            [NSLayoutConstraint constraintWithItem:actionButton attribute:NSLayoutAttributeTop relatedBy:NSLayoutRelationEqual toItem:statusContainerView attribute:NSLayoutAttributeBottom multiplier:1 constant:8],
+            [NSLayoutConstraint constraintWithItem:contentView attribute:NSLayoutAttributeBottom relatedBy:NSLayoutRelationEqual toItem:actionButton attribute:NSLayoutAttributeBottom multiplier:1 constant:20],
+            [NSLayoutConstraint constraintWithItem:actionButton attribute:NSLayoutAttributeLeading relatedBy:NSLayoutRelationGreaterThanOrEqual toItem:statusTextField attribute:NSLayoutAttributeTrailing multiplier:1 constant:25],
+            [NSLayoutConstraint constraintWithItem:contentView attribute:NSLayoutAttributeTrailing relatedBy:NSLayoutRelationEqual toItem:actionButton attribute:NSLayoutAttributeTrailing multiplier:1 constant:20],
+            [actionButton.widthAnchor constraintGreaterThanOrEqualToConstant:100],
+        ]];
+    }
+
+    self = [super initWithWindow:window];
+	if (self != nil)
 	{
         _host = aHost;
-        _centerPointValue = centerPointValue;
-        _minimizable = minimizable;
-        _closable = closable;
-        _windowTitle = [windowTitle copy];
+        _titleField = titleField;
+        _actionButton = actionButton;
+        _progressBar = progressBar;
         [self setShouldCascadeWindows:NO];
+        
+        // Finish setting up bindings
+        {
+            NSRect windowFrame = window.frame;
+            
+            if (centerPointValue != nil) {
+                NSPoint centerPoint = centerPointValue.pointValue;
+                [window setFrameOrigin:NSMakePoint(centerPoint.x - windowFrame.size.width / 2.0, centerPoint.y - windowFrame.size.height / 2.0)];
+            } else {
+                [window center];
+            }
+
+            [titleField bind:NSValueBinding toObject:self withKeyPath:@"title" options:nil];
+            [progressBar bind:NSMaxValueBinding toObject:self withKeyPath:@"maxProgressValue" options:nil];
+            [progressBar bind:NSValueBinding toObject:self withKeyPath:@"progressValue" options:nil];
+            [actionButton bind:NSTitleBinding toObject:self withKeyPath:@"buttonTitle" options:nil];
+            [statusTextField bind:NSValueBinding toObject:self withKeyPath:@"statusText" options:nil];
+            [statusTextField bind:NSHiddenBinding toObject:self withKeyPath:@"statusText" options:@{NSValueTransformerNameBindingOption: NSIsNilTransformerName}];
+        }
     }
     return self;
 }
@@ -76,39 +191,6 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
 - (NSString *)description
 {
     return [NSString stringWithFormat:@"%@ <%@>", [self class], _host.bundlePath];
-}
-
-- (void)windowDidLoad 
-{
-    NSWindow *window = self.window;
-    NSRect windowFrame = window.frame;
-    
-    if (_centerPointValue != nil) {
-        NSPoint centerPoint = _centerPointValue.pointValue;
-        [window setFrameOrigin:NSMakePoint(centerPoint.x - windowFrame.size.width / 2.0, centerPoint.y - windowFrame.size.height / 2.0)];
-    } else {
-        [window center];
-    }
-    
-    if (_minimizable) {
-        window.styleMask = (NSWindowStyleMask)(window.styleMask | NSWindowStyleMaskMiniaturizable);
-    }
-    if (_closable) {
-        window.styleMask = (NSWindowStyleMask)(window.styleMask | NSWindowStyleMaskClosable);
-    }
-    [_progressBar setUsesThreadedAnimation:YES];
-    [_statusTextField setFont:[NSFont monospacedDigitSystemFontOfSize:0 weight:NSFontWeightRegular]];
-    
-    if (@available(macOS 16, *)) {
-        _actionButton.controlSize = NSControlSizeLarge;
-    }
-    
-    window.title = _windowTitle;
-}
-
-- (NSImage *)applicationIcon
-{
-    return [SUApplicationInfo bestIconForHost:_host];
 }
 
 - (void)beginActionWithTitle:(NSString *)aTitle maxProgressValue:(double)aMaxProgressValue statusText:(NSString *)aStatusText
@@ -162,102 +244,6 @@ static const NSTimeInterval SUStatusMinimumDisplayTime = 0.7;
 - (BOOL)isButtonEnabled
 {
     return [_actionButton isEnabled];
-}
-
-- (void)showWindow:(id)sender
-{
-    // If the window is already visible just call through for default handling
-    if (self.window.visible) {
-        [super showWindow:sender];
-        return;
-    }
-
-    // Already scheduled - just keep waiting
-    if (_waitingToShowWindow) {
-        return;
-    }
-
-    _waitingToShowWindow = YES;
-
-    __weak __typeof__(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SUStatusDisplayDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf != nil && strongSelf->_waitingToShowWindow) {
-            [strongSelf _reallyShowWindow:sender];
-        }
-    });
-}
-
-- (void)_reallyShowWindow:(id)sender SPU_OBJC_DIRECT
-{
-    _waitingToShowWindow = NO;
-    _windowShownTime = [NSDate timeIntervalSinceReferenceDate];
-    [super showWindow:sender];
-}
-
-- (void)closeWithCompletionBlock:(void (^)(BOOL userCancelled))completion
-{
-    // If the window isn't on screen, close silently and complete immediately.
-    if (_waitingToShowWindow || !self.window.visible) {
-        [self close];
-        if (completion != nil) {
-            completion(NO);
-        }
-        return;
-    }
-
-    NSTimeInterval elapsed = [NSDate timeIntervalSinceReferenceDate] - _windowShownTime;
-    if (elapsed >= SUStatusMinimumDisplayTime) {
-        [self close];
-        if (completion != nil) {
-            completion(NO);
-        }
-        return;
-    }
-
-    // Replace any previously pending close. (Not expected, but safe.)
-    _pendingCloseCompletion = [completion copy];
-
-    NSTimeInterval remaining = SUStatusMinimumDisplayTime - elapsed;
-    __weak __typeof__(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(remaining * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        __typeof__(self) strongSelf = weakSelf;
-        if (strongSelf == nil) {
-            return;
-        }
-        void (^pendingCompletion)(BOOL) = strongSelf->_pendingCloseCompletion;
-        if (pendingCompletion == nil) {
-            // -close was called externally; pending state was discarded.
-            return;
-        }
-        strongSelf->_pendingCloseCompletion = nil;
-        [strongSelf close];
-        pendingCompletion(NO);
-    });
-}
-
-- (BOOL)closeImmediately
-{
-    void (^pending)(BOOL) = _pendingCloseCompletion;
-    _pendingCloseCompletion = nil;
-    [self close];
-    if (pending == nil) {
-        return NO;
-    }
-    pending(YES);
-    return YES;
-}
-
-- (void)close
-{
-    // -close is the abort path: silently discard any pending buffered
-    // presentation or deferred close. Callers driving the buffered API use
-    // -closeWithCompletionBlock: instead, which gates the
-    // window's actual disappearance behind the minimum display time.
-    _waitingToShowWindow = NO;
-    _windowShownTime = 0;
-    _pendingCloseCompletion = nil;
-    [super close];
 }
 
 - (void)setMaxProgressValue:(double)value

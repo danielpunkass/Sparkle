@@ -27,7 +27,7 @@
     NSOutputStream *_outputStream;
     NSData *_dataToWrite;
     NSInteger _numBytesToWrite;
-
+    
     __weak id<SUTestWebServerConnectionDelegate> _delegate;
 }
 
@@ -35,29 +35,29 @@
 {
     self = [super init];
     assert(self != nil);
-
+    
     _workingDirectory = workingDirectory;
     _delegate = delegate;
-
+    
     CFReadStreamRef readStream = NULL;
     CFWriteStreamRef writeStream = NULL;
     CFStreamCreatePairWithSocket(NULL, handle, &readStream, &writeStream);
     assert(readStream != NULL);
     assert(writeStream != NULL);
-
+    
     _inputStream = (__bridge NSInputStream*)readStream;
     assert(_inputStream != nil);
     _inputStream.delegate = self;
-
+    
     _outputStream = (__bridge NSOutputStream*)writeStream;
     assert(_outputStream != nil);
     _outputStream.delegate = self;
-
+    
     [_inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     [_outputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     [_inputStream open];
     [_outputStream open];
-
+    
     return self;
 }
 
@@ -204,27 +204,27 @@ static void connectCallback(CFSocketRef __unused s, CFSocketCallBackType type, C
 {
     self = [super init];
     assert(self != nil);
-
+    
     CFSocketContext ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.info = (__bridge void*)self;
     _socket = CFSocketCreate(NULL, 0, 0, 0, kCFSocketAcceptCallBack, connectCallback, &ctx);
     assert(_socket != NULL);
-
+    
     struct sockaddr_in address;
     memset(&address, 0, sizeof(address));
     address.sin_len = sizeof(address);
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
     address.sin_addr.s_addr = INADDR_ANY;
-
+    
     // will fail if port is in use.
     CFSocketError socketErr = CFSocketSetAddress(_socket, (CFDataRef)[NSData dataWithBytes:&address length:sizeof(address)]);
     if (socketErr != kCFSocketSuccess) {
         NSLog(@"Socket error: %@", [NSString stringWithUTF8String:strerror(errno)]);
         return nil;
     }
-
+    
     _connections = [[NSMutableArray alloc] init];
     _workingDirectory = workingDirectory;
 
@@ -241,7 +241,7 @@ static void connectCallback(CFSocketRef __unused s, CFSocketCallBackType type, C
         readyHandler();
         [[NSRunLoop currentRunLoop] run];
     }];
-
+    
     [_serverThread start];
 }
 

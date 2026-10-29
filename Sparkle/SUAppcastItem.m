@@ -567,10 +567,10 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
                     processedInfoURL = [NSURL URLWithString:infoLinkURLString];
                 }
                 
-                if ([processedInfoURL.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [processedInfoURL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame) {
+                if (processedInfoURL != nil && ([processedInfoURL.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [processedInfoURL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame)) {
                     infoURL = processedInfoURL;
                 } else {
-                    SULog(SULogLevelError, @"%@ -%@ Info URL must have a http or https URL scheme.", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
+                    SULog(SULogLevelError, @"Info URL must have a http or https URL scheme: %@", infoLinkURLString);
                 }
             }
         }
@@ -622,11 +622,11 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
                 fileURL = [NSURL URLWithString:fileURLString];
             }
             
-            if ([fileURL.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [fileURL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame) {
+            if (fileURL != nil && ([fileURL.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [fileURL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame)) {
                 _fileURL = fileURL;
             } else {
                 if (error) {
-                    *error = @"File URLs must have a http or https URL scheme";
+                    *error = [NSString stringWithFormat:@"File URL must have a http or https URL scheme: %@", fileURLString];
                 }
                 return nil;
             }
@@ -773,6 +773,13 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
         chosenInstallationType = SPUInstallationTypeApplication;
 #endif
         
+        if (signingValidationStatus == SPUAppcastSigningValidationStatusFailed && ![chosenInstallationType isEqualToString:SPUInstallationTypeApplication]) {
+            if (error != NULL) {
+                *error = @"Package based install update is rejected because signing validation on feed failed";
+            }
+            return nil;
+        }
+        
         _installationType = [chosenInstallationType copy];
         
         NSString *enclosureDeltaSparkleExecutableSize = [enclosure objectForKey:SUAppcastAttributeDeltaFromSparkleExecutableSize];
@@ -818,10 +825,10 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
                 } else {
                     url = [NSURL URLWithString:releaseNotesString];
                 }
-                if ([url.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [url.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame) {
+                if (url != nil && ([url.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [url.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame)) {
                     _releaseNotesURL = url;
                 } else {
-                    SULog(SULogLevelError, @"Release notes must have a http or https URL scheme.");
+                    SULog(SULogLevelError, @"Release notes must have a http or https URL scheme: %@", releaseNotesString);
                     _releaseNotesURL = nil;
                 }
             } else if ([_itemDescription hasPrefix:@"http://"] || [_itemDescription hasPrefix:@"https://"]) { // if the description starts with http:// or https:// use that.
@@ -836,7 +843,7 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
     #endif
             ];
             
-            long long releaseNotesLength = [(NSString *)[releaseNotesLinkDictionary objectForKey:@"length"] longLongValue];
+            long long releaseNotesLength = [(NSString *)[releaseNotesLinkDictionary objectForKey:SUAppcastAttributeLength] longLongValue];
             _releaseNotesContentLength = (releaseNotesLength > 0) ? (uint64_t)releaseNotesLength : 0;
         }
         
@@ -850,10 +857,10 @@ static NSString *SPUSanitizeUntrustedVersionString(NSString *versionString, NSSt
             } else {
                 url = [NSURL URLWithString:fullReleaseNotesString];
             }
-            if ([url.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [url.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame) {
+            if (url != nil && ([url.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [url.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame)) {
                 _fullReleaseNotesURL = url;
             } else {
-                SULog(SULogLevelError, @"Full release notes must have a http or https URL scheme.");
+                SULog(SULogLevelError, @"Full release notes must have a http or https URL scheme: %@", fullReleaseNotesString);
                 _fullReleaseNotesURL = nil;
             }
         } else {

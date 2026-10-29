@@ -1,3 +1,49 @@
+# 2.10.1
+
+* Fix not trimming whitespace/newline characters from <sparkle:releaseNotesLink> (#2944) (Zorg)
+* Fix update being installed prematurely if it's located in NFC unicode encoded path (#2943) (Zorg)
+* Update Danish translation (#2940) (Sebastian Livoni)
+* Add missing "Install on Quit" localizations for uk, ru, fr, es, pt-PT. (#2931) (Andrii Selivanov)
+* Add and update translations for Chinese (Hong Kong) (zh-HK) (#2926) (Tiffany Fung)
+* Drop stale sparkle:format when generate_appcast embeds HTML release notes (#2927) (Leo Camus)
+* Skip en and Base when recording Sparkle locales in generate_appcast (#2925) (Leo Camus)
+* Fix appcast child elements being ignored when the Sparkle namespace uses a custom prefix (#2923) (Leo Camus)
+
+# 2.10.0
+
+* Bump minimum deployment target to macOS 12.0 (#2883, #2892) (Zorg, F1248)
+* Don't copy updater progress tool app outside of its bundle (#2900) (Zorg)
+* Fix updating not working the first time if bundle ID ends with ".service" or other irregular bundle-like extensions (#2909) (Zorg, youngjunning)
+* Fix using appcast length fallback if server reports no content size (resulting in indeterminate progress) (#2922) (Zorg)
+* Fix reading release notes content length from appcast for signed feed diagnostics (#2921) (Leo Camus)
+* Update European Portuguese localization (#2912) (Andrei)
+* Fix temporary file leaks when applying binary delta file fails (#2906) (Zorg)
+* Optimize and move updating mdimporter bundles to BinaryDelta applying code (#2905) (Zorg)
+* Fix re-applying file system compression for delta updates on macOS 27 (#2904) (Zorg)
+* Remove CocoaPods support (#2899) (Zorg)
+
+macOS 12.0 or later is now required (due to Xcode 27 dropping support for deploying to older OS versions). CocoaPods support is also now dropped.
+
+If you're not generating appcasts automatically, remember to add `<sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>` element to `<item>`s in your appcast.
+
+# 2.9.6
+
+* Harden safety of installer moving the download archive (#2898) (Zorg, Joshua Rogers)
+* Don't copy progress tool for root user (#2897) (Zorg, Joshua Rogers)
+* Reject package based installs when signing validation failed (#2895) (Zorg)
+
+# 2.9.5
+
+* Harden patching delta file against symbolic link at destination path (#2891) (Zorg, Arpit Jain)
+
+# 2.9.4
+
+* Fix backgrounded apps sometimes not bringing windows from user initiated actions in active focus (#2890) (Zorg, wojciech-kulik)
+
+# 2.9.3
+
+* Fix updating not working the first time if the app's bundle ID ends with ".app" (#2882) (Zorg)
+
 # 2.9.2
 
 * Show hidden window title in update window for accessibility (#2871) (Zorg)

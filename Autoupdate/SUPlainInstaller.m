@@ -388,9 +388,9 @@
 //            SULog(SULogLevelDefault, @"Skipping atomic rename/swap and gatekeeper scan because Autoupdate is not signed with same identity as the new update %@", bundle.bundleURL.lastPathComponent);
 //        }
 //    }
+        
+            _canPerformSafeAtomicSwap = NO;
     
-    _canPerformSafeAtomicSwap = NO;
-
     _newAndOldBundlesOnSameVolume = [fileManager itemAtURL:bundle.bundleURL isOnSameVolumeItemAsURL:_host.bundle.bundleURL];
     
     // We can do a lot of the installation work ahead of time if the new app update does not need to be copied to another volume

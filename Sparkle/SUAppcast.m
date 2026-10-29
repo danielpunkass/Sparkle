@@ -145,7 +145,8 @@
                     [dict setObject:descriptionDict forKey:SURSSElementDescription];
                 }
             } else if ([name isEqualToString:SUAppcastElementReleaseNotesLink]) {
-                NSString *releaseNotesLink = node.stringValue;
+                // Trim whitespace to maintain backwards compatibility
+                NSString *releaseNotesLink = [node.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
                 if (releaseNotesLink != nil) {
                     NSDictionary *attributes = [self attributesOfNode:(NSXMLElement *)node];
                     
@@ -177,7 +178,7 @@
                 NSMutableArray *names = [NSMutableArray array];
                 NSEnumerator *childEnum = [[node children] objectEnumerator];
                 for (NSXMLNode *child in childEnum) {
-                    NSString *childName = child.name;
+                    NSString *childName = [self sparkleNamespacedNameOfNode:child];
                     if (childName) {
                         [names addObject:childName];
                     }
@@ -187,12 +188,13 @@
                 NSMutableSet *informationalUpdateVersions = [NSMutableSet set];
                 NSEnumerator *childEnum = [[node children] objectEnumerator];
                 for (NSXMLNode *child in childEnum) {
-                    if ([child.name isEqualToString:SUAppcastElementVersion]) {
+                    NSString *childName = [self sparkleNamespacedNameOfNode:child];
+                    if ([childName isEqualToString:SUAppcastElementVersion]) {
                         NSString *version = child.stringValue;
                         if (version != nil) {
                             [informationalUpdateVersions addObject:version];
                         }
-                    } else if ([child.name isEqualToString:SUAppcastElementBelowVersion]) {
+                    } else if ([childName isEqualToString:SUAppcastElementBelowVersion]) {
                         NSString *version = child.stringValue;
                         if (version != nil) {
                             // Denote version is used as an upper bound by using '<'

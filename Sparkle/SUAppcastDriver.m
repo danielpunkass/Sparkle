@@ -35,8 +35,10 @@
 #include "AppKitPrevention.h"
 
 #define SUInitialFailedFeedSigningValidationDateKey @"SUInitialFailedFeedSigningValidationDate"
+#define SUFeedLastCacheBypassCheckTimeKey @"SUFeedLastCacheBypassCheckTime"
 
 #define DEFAULT_APPCAST_FAILURE_EXPIRATION_INTERVAL 1728000 // 20 days
+#define CACHE_BYPASS_CHECK_INTERVAL 1814400 // 3 weeks
 
 @interface SUAppcastDriver () <SPUDownloadDriverDelegate>
 @end
@@ -63,7 +65,7 @@
     return self;
 }
 
-- (void)loadAppcastFromURL:(NSURL *)appcastURL userAgent:(NSString *)userAgent httpHeaders:(NSDictionary * _Nullable)httpHeaders inBackground:(BOOL)background
+- (void)loadAppcastFromURL:(NSURL *)appcastURL userAgent:(NSString *)userAgent httpHeaders:(NSDictionary * _Nullable)httpHeaders inBackground:(BOOL)background resumingUpdate:(BOOL)resumingUpdate
 {
     assert(NSThread.isMainThread);
     
@@ -73,13 +75,53 @@
     }
     requestHTTPHeaders[@"Accept"] = @"application/rss+xml,*/*;q=0.1";
     
-    _downloadDriver = [[SPUDownloadDriver alloc] initWithRequestURL:appcastURL host:_host userAgent:userAgent httpHeaders:requestHTTPHeaders inBackground:background delegate:self];
+    NSURLRequestCachePolicy cachePolicy;
+    if ([_host boolForInfoDictionaryKey:SUDisableFeedCacheValidationKey]) {
+        // The developer disabled feed cache validation
+        cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+    } else if (resumingUpdate) {
+        // We already have an update downloaded or installing that we can fall back to resuming,
+        // so we will risk always respecting the cache
+        cachePolicy = NSURLRequestReloadRevalidatingCacheData;
+    } else if (!background) {
+        // Always fetch the freshest feed when the user explicitly asks us to check
+        cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+    } else {
+        // With NSURLRequestReloadRevalidatingCacheData, ETag / If-Modified-Since can be used so that
+        // a previously cached file can be used if it hasn't changed on the server.
+        // However we have a bypass check interval periodically to force ignoring the cache data if
+        // something happens to go wrong.
+        SUHost *hostForCacheBypassCheckTime = _host;
+        NSString *cacheBypassCheckTimeKey = [SUHost mainBundleUserDefaultsKey:SUFeedLastCacheBypassCheckTimeKey forHost:&hostForCacheBypassCheckTime];
+
+        NSDate *lastCacheBypassCheckDate = [hostForCacheBypassCheckTime objectForUserDefaultsKey:cacheBypassCheckTimeKey ofClass:NSDate.class];
+
+        BOOL needsCacheBypass;
+        if (lastCacheBypassCheckDate == nil) {
+            needsCacheBypass = YES;
+        } else {
+            NSTimeInterval intervalSinceLastCacheBypassCheck = [[NSDate date] timeIntervalSinceDate:lastCacheBypassCheckDate];
+            needsCacheBypass = (intervalSinceLastCacheBypassCheck < 0 || intervalSinceLastCacheBypassCheck >= CACHE_BYPASS_CHECK_INTERVAL);
+        }
+
+        cachePolicy = needsCacheBypass ? NSURLRequestReloadIgnoringLocalCacheData : NSURLRequestReloadRevalidatingCacheData;
+    }
+
+    _downloadDriver = [[SPUDownloadDriver alloc] initWithRequestURL:appcastURL host:_host userAgent:userAgent httpHeaders:requestHTTPHeaders inBackground:background cachePolicy:cachePolicy delegate:self];
     
     [_downloadDriver downloadFile];
 }
 
 - (void)downloadDriverDidDownloadData:(SPUDownloadData *)downloadData
 {
+    if (_downloadDriver.request.cachePolicy == NSURLRequestReloadIgnoringLocalCacheData) {
+        // Reset the cache bypass any time the feed has been downloaded successfully
+        SUHost *hostForCacheBypassCheckTime = _host;
+        NSString *cacheBypassCheckTimeKey = [SUHost mainBundleUserDefaultsKey:SUFeedLastCacheBypassCheckTimeKey forHost:&hostForCacheBypassCheckTime];
+
+        [hostForCacheBypassCheckTime setObject:[NSDate date] forUserDefaultsKey:cacheBypassCheckTimeKey];
+    }
+
     SPUAppcastItemStateResolver *stateResolver = [[SPUAppcastItemStateResolver alloc] initWithHostVersion:_host.version applicationVersionComparator:[self versionComparator] standardVersionComparator:[SUStandardVersionComparator defaultComparator]];
     
     NSData *downloadedAppcastData = downloadData.data;
@@ -113,21 +155,8 @@
         // If a significant period of time passes with verification still failing, we may operate in a 'safe' mode as fallback
         // and allow an app to be updated through key rotation
         
-        // If main bundle and host bundle differ, use the main bundle (updater) with a host bundle identifier to record the validation failure date
-        // This ensures external updaters record this date separately from an app updating itself.
-        SUHost *hostForFailedSigningValidationDate;
-        
-        NSString *initialFailedFeedSigningValidationDateKey;
-        NSBundle *mainBundle = NSBundle.mainBundle;
-        if ([mainBundle isEqual:_host.bundle]) {
-            hostForFailedSigningValidationDate = _host;
-            initialFailedFeedSigningValidationDateKey = SUInitialFailedFeedSigningValidationDateKey;
-        } else {
-            hostForFailedSigningValidationDate = [[SUHost alloc] initWithBundle:mainBundle];
-            
-            NSString *hostBundleIdentifier = _host.bundle.bundleIdentifier;
-            initialFailedFeedSigningValidationDateKey = (hostBundleIdentifier != nil) ? [SUInitialFailedFeedSigningValidationDateKey"_" stringByAppendingString:hostBundleIdentifier] : nil;
-        }
+        SUHost *hostForFailedSigningValidationDate = _host;
+        NSString *initialFailedFeedSigningValidationDateKey = [SUHost mainBundleUserDefaultsKey:SUInitialFailedFeedSigningValidationDateKey forHost:&hostForFailedSigningValidationDate];
         
         NSError *verifyAppcastDataInnerError = nil;
         if (![signatureVerifier verifyData:verifiedAppcastData signatures:signatures fileKind:@"appcast" verifierInformation:verifierInformation error:&verifyAppcastDataInnerError]) {
@@ -148,7 +177,15 @@
                     [hostForFailedSigningValidationDate setObject:currentDate forUserDefaultsKey:initialFailedFeedSigningValidationDateKey];
                     canRecoverFromSigningValidationFailure = NO;
                 } else {
-                    canRecoverFromSigningValidationFailure = ([currentDate timeIntervalSinceDate:firstFailedSigningValidationDate] >= failureExpirationInterval);
+                    NSTimeInterval timeIntervalSinceFirstFailedValidationDate = [currentDate timeIntervalSinceDate:firstFailedSigningValidationDate];
+                    
+                    if (timeIntervalSinceFirstFailedValidationDate < 0) {
+                        // Record first signing validation date if stored date is far out in future
+                        [hostForFailedSigningValidationDate setObject:currentDate forUserDefaultsKey:initialFailedFeedSigningValidationDateKey];
+                        canRecoverFromSigningValidationFailure = NO;
+                    } else {
+                        canRecoverFromSigningValidationFailure = (timeIntervalSinceFirstFailedValidationDate >= failureExpirationInterval);
+                    }
                 }
             }
             

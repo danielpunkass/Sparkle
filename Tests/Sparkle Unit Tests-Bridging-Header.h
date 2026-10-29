@@ -12,6 +12,7 @@
 #import "SUAppcast.h"
 #import "SUAppcast+Private.h"
 #import "SUAppcastItem.h"
+#import "SUAppcastItem+Private.h"
 #import "SUAppcastDriver.h"
 #import "SUVersionComparisonProtocol.h"
 #import "SUStandardVersionComparator.h"
@@ -45,12 +46,6 @@ static const char *SUAppleQuarantineIdentifier = "com.apple.quarantine";
 + (SUAppcast *)filterSupportedAppcast:(SUAppcast *)appcast phasedUpdateGroup:(NSNumber * _Nullable)phasedUpdateGroup skippedUpdate:(SPUSkippedUpdate * _Nullable)skippedUpdate currentDate:(NSDate *)currentDate hostVersion:(NSString *)hostVersion versionComparator:(id<SUVersionComparison>)versionComparator testMinimumSystemRequirements:(BOOL)testMinimumSystemRequirements testMinimumAutoupdateVersion:(BOOL)testMinimumAutoupdateVersion;
 
 + (SUAppcast *)filterAppcast:(SUAppcast *)appcast forMacOSAndAllowedChannels:(NSSet<NSString *> *)allowedChannels;
-
-@end
-
-@interface SUBinaryDeltaUnarchiver (Private)
-
-+ (void)updateSpotlightImportersAtBundlePath:(NSString *)targetPath;
 
 @end
 
